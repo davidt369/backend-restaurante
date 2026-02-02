@@ -3,11 +3,17 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { DateFormatterInterceptor } from './common/interceptors/date-formatter.interceptor';
+
+// ⏰ Configurar zona horaria para todo el proyecto (Bolivia)
+process.env.TZ = 'America/La_Paz';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
-  // Configurar zona horaria del proceso Node.js a Bolivia
-  process.env.TZ = 'America/La_Paz';
+
+  // 📅 Interceptor global para formatear fechas
+  app.useGlobalInterceptors(new DateFormatterInterceptor());
 
   // 🌐 CORS
   const frontendUrl =
@@ -55,8 +61,8 @@ async function bootstrap() {
   });
   const port = configService.get<number>('PORT') ?? 4000;
 
-  await app.listen(4000);
-  console.log(`🚀 Servidor corriendo en http://localhost:${port}/api/`);
-  console.log(`📚 Swagger en http://localhost:${port}/api/v1/docs`);
+  await app.listen(port);
+  console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
+  console.log(`📚 Swagger en http://localhost:${port}/api`);
 }
 void bootstrap();

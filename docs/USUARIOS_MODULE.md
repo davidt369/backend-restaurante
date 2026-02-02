@@ -14,6 +14,22 @@ Módulo completo de administración de usuarios implementado con principios SOLI
 - ✅ Documentación completa con Swagger
 - ✅ Manejo de errores apropiado
 - ✅ Principios SOLID aplicados
+- ✅ Formato de fechas boliviano automático (21:59 - 01/02/2026)
+
+## 📅 Formato de Fechas
+
+**Todas las fechas** (`creado_en`, `actualizado_en`) **se formatean automáticamente**:
+
+```
+Formato: HH:mm - dd/MM/yyyy
+Ejemplo: 21:59 - 01/02/2026
+```
+
+- **Entrada**: No necesitas enviar fechas (se generan automáticamente)
+- **Salida**: Formato boliviano en todas las respuestas
+- **Zona horaria**: America/La_Paz (Bolivia)
+
+👉 **Ver documentación completa**: [DATE_FORMAT.md](./DATE_FORMAT.md)
 
 ## 📋 Endpoints Disponibles
 
@@ -44,8 +60,8 @@ Authorization: Bearer <token>
   "nombre": "Juan Pérez",
   "nombre_usuario": "juanperez",
   "rol": "cajero",
-  "creado_en": "2026-02-01T00:00:00.000Z",
-  "actualizado_en": "2026-02-01T00:00:00.000Z"
+  "creado_en": "21:59 - 01/02/2026",
+  "actualizado_en": "21:59 - 01/02/2026"
 }
 ```
 

@@ -12,6 +12,22 @@ Módulo completo de autenticación JWT implementado con NestJS, Drizzle ORM y Pa
 - ✅ Documentación completa con Swagger
 - ✅ Soporte para roles (admin, cajero)
 - ✅ Soft delete (usuarios no se eliminan físicamente)
+- ✅ Formato de fechas boliviano automático (21:59 - 01/02/2026)
+
+## 📅 Formato de Fechas
+
+**Todas las fechas en las respuestas** se formatean automáticamente al formato boliviano:
+
+```
+HH:mm - dd/MM/yyyy
+Ejemplo: 21:59 - 01/02/2026
+```
+
+- **Zona horaria**: America/La_Paz (Bolivia)
+- **Entrada**: Acepta ISO 8601, strings de fecha, timestamps
+- **Salida**: Formato boliviano automático
+
+👉 **Ver documentación completa**: [DATE_FORMAT.md](./DATE_FORMAT.md)
 
 ## 🚀 Configuración Inicial
 
@@ -91,6 +107,8 @@ Abre tu navegador en: **http://localhost:4000/api**
   }
 }
 ```
+
+**Nota sobre fechas**: Las fechas `creado_en` y `actualizado_en` se formatean automáticamente a `21:59 - 01/02/2026` cuando se incluyen en las respuestas.
 
 ### 2. Usar el Token en Swagger
 

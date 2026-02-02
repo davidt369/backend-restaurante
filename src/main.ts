@@ -2,9 +2,23 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-
+import { ConfigService } from '@nestjs/config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  // Configurar zona horaria del proceso Node.js a Bolivia
+  process.env.TZ = 'America/La_Paz';
+
+  // 🌐 CORS
+  const frontendUrl =
+    configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+
+  app.enableCors({
+    origin: frontendUrl,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   // Configurar pipes de validación global
   app.useGlobalPipes(
@@ -39,9 +53,10 @@ async function bootstrap() {
       persistAuthorization: true, // Mantiene el token en localStorage
     },
   });
+  const port = configService.get<number>('PORT') ?? 4000;
 
   await app.listen(4000);
-  console.log(`🚀 Aplicación corriendo en: ${await app.getUrl()}`);
-  console.log(`📚 Documentación Swagger: ${await app.getUrl()}/api`);
+  console.log(`🚀 Servidor corriendo en http://localhost:${port}/api/`);
+  console.log(`📚 Swagger en http://localhost:${port}/api/v1/docs`);
 }
 void bootstrap();

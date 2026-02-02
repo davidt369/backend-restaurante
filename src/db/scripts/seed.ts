@@ -1,22 +1,44 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import * as schema from '../schema';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import * as bcrypt from 'bcrypt';
 
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+import * as schema from '../schema';
 
-if (!process.env.DATABASE_URL) {
+// ===============================
+// Cargar variables de entorno
+// ===============================
+const envPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: envPath });
+
+// ===============================
+// Validar DATABASE_URL
+// ===============================
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
   throw new Error('DATABASE_URL is not set');
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// ===============================
+// Conexión DB
+// ===============================
+const pool = new Pool({
+  connectionString: databaseUrl,
+});
+
 const db = drizzle(pool, { schema });
 
-async function main() {
+// ===============================
+// Seed
+// ===============================
+async function main(): Promise<void> {
   console.log('⏳ Seeding database...');
 
-  // Inserta usuarios de ejemplo (ajusta los campos según tu esquema real)
+  // Hash de contraseñas
+  const adminPassword = await bcrypt.hash('Admin123!', 10);
+  const cajeroPassword = await bcrypt.hash('Cajero123!', 10);
+
   await db
     .insert(schema.usuarios)
     .values([
@@ -24,7 +46,7 @@ async function main() {
         id: 'admin-id-0001',
         nombre_usuario: 'admin',
         nombre: 'Administrador',
-        contrasena: 'adminpasswordhash',
+        contrasena: adminPassword,
         rol: 'admin',
         creado_en: new Date(),
         actualizado_en: new Date(),
@@ -33,7 +55,7 @@ async function main() {
         id: 'cajero-id-0001',
         nombre_usuario: 'cajero1',
         nombre: 'Cajero Uno',
-        contrasena: 'cajeropasswordhash',
+        contrasena: cajeroPassword,
         rol: 'cajero',
         creado_en: new Date(),
         actualizado_en: new Date(),
@@ -42,12 +64,16 @@ async function main() {
     .onConflictDoNothing();
 
   console.log('✅ Seeding complete');
+  console.log('📝 Usuarios creados:');
+  console.log('   👤 admin / Admin123!');
+  console.log('   👤 cajero1 / Cajero123!');
   await pool.end();
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+// ===============================
+// Ejecución segura
+// ===============================
+main().catch((error: Error) => {
+  console.error('❌ Seed error:', error.message);
+  process.exit(1);
+});

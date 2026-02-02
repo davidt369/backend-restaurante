@@ -1,32 +1,53 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
 import { sql } from 'drizzle-orm';
-import * as dotenv from 'dotenv'; // Ensure dotenv is loaded
+import { Pool } from 'pg';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
-dotenv.config();
+// ===============================
+// Cargar variables de entorno
+// ===============================
+const dotenvPath = path.resolve(process.cwd(), '.env');
+dotenv.config({ path: dotenvPath });
 
-if (!process.env.DATABASE_URL) {
+// ===============================
+// Validar DATABASE_URL
+// ===============================
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
   throw new Error('DATABASE_URL is not set');
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// ===============================
+// Conexión a la base de datos
+// ===============================
+const pool = new Pool({
+  connectionString: databaseUrl,
+});
+
 const db = drizzle(pool);
 
-async function main() {
+// ===============================
+// Script principal
+// ===============================
+async function main(): Promise<void> {
   console.log('⏳ Resetting database...');
 
-  // Drop and recreate public schema to wipe everything
-  await db.execute(sql`DROP SCHEMA public CASCADE`);
-  await db.execute(sql`CREATE SCHEMA public`);
-  await db.execute(sql`GRANT ALL ON SCHEMA public TO public`);
-  await db.execute(sql`COMMENT ON SCHEMA public IS 'standard public schema'`);
+  await db.execute(sql.raw('DROP SCHEMA IF EXISTS public CASCADE'));
+  await db.execute(sql.raw('CREATE SCHEMA public'));
+  await db.execute(sql.raw('GRANT ALL ON SCHEMA public TO public'));
+  await db.execute(
+    sql.raw("COMMENT ON SCHEMA public IS 'standard public schema'"),
+  );
 
   console.log('✅ Database reset complete');
   await pool.end();
-  process.exit(0);
 }
 
-main().catch((err) => {
-  console.error(err);
+// ===============================
+// Ejecución segura
+// ===============================
+main().catch((error: Error) => {
+  console.error('❌ Error resetting database:', error.message);
   process.exit(1);
 });

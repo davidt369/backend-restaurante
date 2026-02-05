@@ -15,9 +15,12 @@ async function bootstrap() {
   // 📅 Interceptor global para formatear fechas
   app.useGlobalInterceptors(new DateFormatterInterceptor());
 
+  // 🌐 Prefijo global para todas las rutas
+  app.setGlobalPrefix('api');
+
   // 🌐 CORS
   const frontendUrl =
-    configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
 
   app.enableCors({
     origin: frontendUrl,

@@ -8,6 +8,8 @@ import {
   integer,
   numeric,
   boolean,
+  doublePrecision,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 
 export const usuarios = pgTable('usuarios', {
@@ -81,4 +83,78 @@ export const gastos_caja = pgTable('gastos_caja', {
   borrado_en: timestamp('borrado_en', { withTimezone: true }),
 });
 
-export default { usuarios, caja_turno, gastos_caja };
+export const productos = pgTable('productos', {
+  id: text('id').primaryKey(),
+  nombre: varchar('nombre', { length: 60 }).notNull(),
+  precio: numeric('precio', { precision: 10, scale: 2 }).notNull(),
+  stock: integer('stock').notNull().default(0),
+  unidad: varchar('unidad', { length: 20 }).notNull(),
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
+export const ingredientes = pgTable('ingredientes', {
+  id: text('id').primaryKey(),
+  nombre: varchar('nombre', { length: 100 }).notNull(),
+  unidad: varchar('unidad', { length: 20 }).notNull(),
+  cantidad: doublePrecision('cantidad').default(0).notNull(),
+  cantidad_minima: doublePrecision('cantidad_minima').default(0).notNull(),
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
+export const platos = pgTable('platos', {
+  id: text('id').primaryKey(),
+  nombre: varchar('nombre', { length: 60 }).notNull(),
+  precio: numeric('precio', { precision: 10, scale: 2 }).notNull(),
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
+export const plato_ingredientes = pgTable(
+  'plato_ingredientes',
+  {
+    plato_id: text('plato_id')
+      .notNull()
+      .references(() => platos.id, { onDelete: 'cascade' }),
+    ingrediente_id: text('ingrediente_id')
+      .notNull()
+      .references(() => ingredientes.id),
+    cantidad: doublePrecision('cantidad').notNull(),
+    creado_en: timestamp('creado_en', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    borrado_en: timestamp('borrado_en', { withTimezone: true }),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.plato_id, table.ingrediente_id] }),
+  }),
+);
+
+export default {
+  usuarios,
+  caja_turno,
+  gastos_caja,
+  productos,
+  ingredientes,
+  platos,
+  plato_ingredientes,
+};

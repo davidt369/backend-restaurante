@@ -49,7 +49,10 @@ CREATE TABLE gastos_caja (
 
     monto NUMERIC(10,2) NOT NULL CHECK (monto > 0),
 
-    creado TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+     creado_en TIMESTAMPTZ DEFAULT NOW(),
+    actualizado_en TIMESTAMPTZ DEFAULT NOW(),
+    borrado_en TIMESTAMPTZ
+
 );
 
 CREATE TABLE productos (

@@ -149,6 +149,127 @@ export const plato_ingredientes = pgTable(
   }),
 );
 
+export const transacciones = pgTable('transacciones', {
+  id: serial('id').primaryKey(),
+  nro_reg: integer('nro_reg').notNull(),
+  fecha: date('fecha').defaultNow(),
+  hora: timestamp('hora', { withTimezone: true }).defaultNow(),
+  tipo: varchar('tipo', { length: 30 }).default('venta'),
+  concepto: text('concepto').notNull(),
+
+  // Montos
+  monto_total: numeric('monto_total', { precision: 10, scale: 2 })
+    .notNull()
+    .default('0'),
+  monto_pagado: numeric('monto_pagado', { precision: 10, scale: 2 })
+    .notNull()
+    .default('0'),
+  // monto_pendiente se calcula: monto_total - monto_pagado
+
+  // Ubicación/tipo de servicio
+  mesa: varchar('mesa', { length: 50 }), // "Mesa 5", "Para llevar", "Delivery", "Auto"
+  cliente: varchar('cliente', { length: 100 }),
+
+  // Estado: pendiente, abierto, cerrado
+  estado: varchar('estado', { length: 20 }).default('pendiente'),
+
+  // Referencias
+  caja_id: integer('caja_id').references(() => caja_turno.id),
+  usuario_id: text('usuario_id').references(() => usuarios.id),
+
+  // Auditoría
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
+export const detalle_items = pgTable('detalle_items', {
+  id: serial('id').primaryKey(),
+  transaccion_id: integer('transaccion_id')
+    .notNull()
+    .references(() => transacciones.id, { onDelete: 'cascade' }),
+
+  // Producto O Plato (excluyente)
+  producto_id: text('producto_id').references(() => productos.id),
+  plato_id: text('plato_id').references(() => platos.id),
+
+  // Cantidades y precios
+  cantidad: numeric('cantidad', { precision: 10, scale: 2 }).notNull(),
+  precio_unitario: numeric('precio_unitario', {
+    precision: 10,
+    scale: 2,
+  }).notNull(),
+  subtotal: numeric('subtotal', { precision: 10, scale: 2 }).notNull(),
+
+  // Notas del cliente para este item
+  notas: text('notas'), // "Sin cebolla", "Punto medio", "Extra picante"
+
+  // Auditoría
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
+export const detalle_item_extras = pgTable('detalle_item_extras', {
+  id: serial('id').primaryKey(),
+  detalle_item_id: integer('detalle_item_id')
+    .notNull()
+    .references(() => detalle_items.id, { onDelete: 'cascade' }),
+
+  // Puede ser ingrediente conocido O descripción libre
+  ingrediente_id: text('ingrediente_id').references(() => ingredientes.id),
+  descripcion: text('descripcion'), // "Extra queso", "Porción doble carne"
+
+  precio: numeric('precio', { precision: 10, scale: 2 }).notNull(),
+  cantidad: numeric('cantidad', { precision: 10, scale: 2 }).default('1'),
+
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
+export const pagos = pgTable('pagos', {
+  id: serial('id').primaryKey(),
+  transaccion_id: integer('transaccion_id')
+    .notNull()
+    .references(() => transacciones.id, { onDelete: 'cascade' }),
+
+  // Método de pago: efectivo, qr
+  metodo_pago: varchar('metodo_pago', { length: 20 }).notNull(),
+
+  // Montos
+  monto: numeric('monto', { precision: 10, scale: 2 }).notNull(),
+  monto_recibido: numeric('monto_recibido', { precision: 10, scale: 2 }), // Solo para efectivo
+  // cambio se calcula: monto_recibido - monto (cuando es efectivo)
+
+  // Referencia para QR
+  referencia_qr: varchar('referencia_qr', { length: 100 }),
+
+  // Usuario que registró el pago
+  usuario_id: text('usuario_id').references(() => usuarios.id),
+
+  // Auditoría
+  creado_en: timestamp('creado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  actualizado_en: timestamp('actualizado_en', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  borrado_en: timestamp('borrado_en', { withTimezone: true }),
+});
+
 export default {
   usuarios,
   caja_turno,
@@ -157,4 +278,8 @@ export default {
   ingredientes,
   platos,
   plato_ingredientes,
+  transacciones,
+  detalle_items,
+  detalle_item_extras,
+  pagos,
 };

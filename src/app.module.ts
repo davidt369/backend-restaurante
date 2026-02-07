@@ -7,6 +7,7 @@ import { CajaModule } from './modules/caja/caja.module';
 import { ProductosModule } from './modules/productos/productos.module';
 import { IngredientesModule } from './modules/ingredientes/ingredientes.module';
 import { PlatosModule } from './modules/platos/platos.module';
+import { TransaccionesModule } from './modules/transacciones/transacciones.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { PlatosModule } from './modules/platos/platos.module';
     ProductosModule,
     IngredientesModule,
     PlatosModule,
+    TransaccionesModule,
   ],
   // providers: [drizzleProvider],
   // exports: [drizzleProvider],

@@ -135,7 +135,7 @@ CREATE TABLE detalle_items (
     -- Producto O Plato (excluyente)
     producto_id TEXT REFERENCES productos(id),
     plato_id TEXT REFERENCES platos(id),
-     descripcion TEXT, -- "Extra queso", "Porción doble carne"
+    
     -- Cantidades y precios
     cantidad NUMERIC(10,2) NOT NULL CHECK (cantidad > 0),
     precio_unitario NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
@@ -165,7 +165,7 @@ CREATE TABLE detalle_item_extras (
     
     -- Puede ser ingrediente conocido O descripción libre
     ingrediente_id TEXT REFERENCES ingredientes(id),
-   
+    descripcion TEXT, -- "Extra queso", "Porción doble carne"
     
     precio NUMERIC(10,2) NOT NULL CHECK (precio >= 0),
     cantidad NUMERIC(10,2) DEFAULT 1 CHECK (cantidad > 0),

@@ -19,13 +19,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // 🌐 CORS
-  const frontendUrl =
-    configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
-
-  // Soporte para múltiples orígenes y limpieza de slashes finales
-  const allowedOrigins = frontendUrl
-    .split(',')
-    .map((url) => url.trim().replace(/\/$/, ''));
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://young-waterfall-2598.maroger369.workers.dev',
+  ];
 
   app.enableCors({
     origin: allowedOrigins,

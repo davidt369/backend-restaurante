@@ -22,8 +22,13 @@ async function bootstrap() {
   const frontendUrl =
     configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
 
+  // Soporte para múltiples orígenes y limpieza de slashes finales
+  const allowedOrigins = frontendUrl
+    .split(',')
+    .map((url) => url.trim().replace(/\/$/, ''));
+
   app.enableCors({
-    origin: frontendUrl,
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

@@ -10,6 +10,7 @@ import { eq, isNull, and } from 'drizzle-orm';
 import { CreatePlatoDto } from './dto/create-plato.dto';
 import { UpdatePlatoDto } from './dto/update-plato.dto';
 import { AddIngredienteDto } from './dto/add-ingrediente.dto';
+import { UpdatePlatoIngredienteDto } from './dto/update-ingrediente.dto';
 import { nanoid } from 'nanoid';
 import type { InferSelectModel } from 'drizzle-orm';
 import { DRIZZLE_DB } from '../../drizzle/drizzle.module';
@@ -22,7 +23,7 @@ export class PlatosService {
   constructor(
     @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
-  ) {}
+  ) { }
 
   async create(createPlatoDto: CreatePlatoDto): Promise<Plato> {
     const id = nanoid(10);
@@ -124,7 +125,7 @@ export class PlatosService {
       );
     }
 
-    // Verificar si ya existe la relación
+    // Verificar si ya existe la relación (incluyendo borrados)
     const [existente] = await this.db
       .select()
       .from(schema.plato_ingredientes)
@@ -135,16 +136,40 @@ export class PlatosService {
             schema.plato_ingredientes.ingrediente_id,
             addIngredienteDto.ingrediente_id,
           ),
-          isNull(schema.plato_ingredientes.borrado_en),
         ),
       );
 
-    if (existente) {
+    // Si existe y NO está borrado, lanzar error
+    if (existente && !existente.borrado_en) {
       throw new BadRequestException(
         'Este ingrediente ya está agregado al plato',
       );
     }
 
+    // Si existe pero está borrado, restaurarlo
+    if (existente && existente.borrado_en) {
+      const [platoIngrediente] = await this.db
+        .update(schema.plato_ingredientes)
+        .set({
+          cantidad: addIngredienteDto.cantidad,
+          borrado_en: null,
+          actualizado_en: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.plato_ingredientes.plato_id, platoId),
+            eq(
+              schema.plato_ingredientes.ingrediente_id,
+              addIngredienteDto.ingrediente_id,
+            ),
+          ),
+        )
+        .returning();
+
+      return platoIngrediente;
+    }
+
+    // Si no existe, crear nuevo registro
     const [platoIngrediente] = await this.db
       .insert(schema.plato_ingredientes)
       .values({
@@ -218,6 +243,46 @@ export class PlatosService {
 
     return {
       message: 'Ingrediente removido del plato exitosamente',
+    };
+  }
+
+  async updateIngrediente(
+    platoId: string,
+    ingredienteId: string,
+    updatePlatoIngredienteDto: UpdatePlatoIngredienteDto,
+  ): Promise<{ message: string }> {
+    await this.findOne(platoId);
+
+    const [relacion] = await this.db
+      .select()
+      .from(schema.plato_ingredientes)
+      .where(
+        and(
+          eq(schema.plato_ingredientes.plato_id, platoId),
+          eq(schema.plato_ingredientes.ingrediente_id, ingredienteId),
+          isNull(schema.plato_ingredientes.borrado_en),
+        ),
+      );
+
+    if (!relacion) {
+      throw new NotFoundException('La relación plato-ingrediente no existe');
+    }
+
+    await this.db
+      .update(schema.plato_ingredientes)
+      .set({
+        cantidad: updatePlatoIngredienteDto.cantidad,
+        actualizado_en: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.plato_ingredientes.plato_id, platoId),
+          eq(schema.plato_ingredientes.ingrediente_id, ingredienteId),
+        ),
+      );
+
+    return {
+      message: 'Cantidad de ingrediente actualizada correctamente',
     };
   }
 }

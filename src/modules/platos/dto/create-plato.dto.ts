@@ -6,6 +6,7 @@ import {
   Min,
   MaxLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreatePlatoDto {
   @ApiProperty({
@@ -23,6 +24,7 @@ export class CreatePlatoDto {
     example: 25.0,
     minimum: 0,
   })
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   precio: number;

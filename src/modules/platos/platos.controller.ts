@@ -19,6 +19,7 @@ import { PlatosService } from './platos.service';
 import { CreatePlatoDto } from './dto/create-plato.dto';
 import { UpdatePlatoDto } from './dto/update-plato.dto';
 import { AddIngredienteDto } from './dto/add-ingrediente.dto';
+import { UpdatePlatoIngredienteDto } from './dto/update-ingrediente.dto';
 
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -124,5 +125,24 @@ export class PlatosController {
     @Param('ingredienteId') ingredienteId: string,
   ) {
     return this.platosService.removeIngrediente(id, ingredienteId);
+  }
+
+  @Patch(':id/ingredientes/:ingredienteId')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Actualizar cantidad de ingrediente en plato' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cantidad actualizada correctamente',
+  })
+  updateIngrediente(
+    @Param('id') id: string,
+    @Param('ingredienteId') ingredienteId: string,
+    @Body() updatePlatoIngredienteDto: UpdatePlatoIngredienteDto,
+  ) {
+    return this.platosService.updateIngrediente(
+      id,
+      ingredienteId,
+      updatePlatoIngredienteDto,
+    );
   }
 }

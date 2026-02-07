@@ -173,6 +173,9 @@ export const transacciones = pgTable('transacciones', {
   // Estado: pendiente, abierto, cerrado
   estado: varchar('estado', { length: 20 }).default('pendiente'),
 
+  // Estado de Cocina: pendiente, terminado
+  estado_cocina: varchar('estado_cocina', { length: 20 }).default('pendiente'),
+
   // Referencias
   caja_id: integer('caja_id').references(() => caja_turno.id),
   usuario_id: text('usuario_id').references(() => usuarios.id),

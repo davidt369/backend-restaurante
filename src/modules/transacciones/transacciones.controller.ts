@@ -54,6 +54,31 @@ export class TransaccionesController {
     return this.transaccionesService.findAll();
   }
 
+  // ========== VISTA DE COCINA ==========
+
+  @Get('cocina/pendientes')
+  @ApiOperation({ summary: 'Obtener pedidos pendientes para cocina' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de pedidos pendientes para cocina',
+  })
+  getPendientesCocina() {
+    return this.transaccionesService.findPendientesCocina();
+  }
+
+  @Patch(':id/cocina/completar')
+  @ApiOperation({ summary: 'Marcar pedido de cocina como terminado' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pedido marcado como terminado',
+  })
+  @ApiParam({ name: 'id', type: 'number' })
+  completarOrdenCocina(@Param('id', ParseIntPipe) id: number) {
+    return this.transaccionesService.completarOrdenCocina(id);
+  }
+
+  // =====================================
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener una transacción por ID' })
   @ApiResponse({

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../db/schema';
-import { eq, isNull, and, sql, desc } from 'drizzle-orm';
+import { eq, isNull, and, sql, desc, asc } from 'drizzle-orm';
 import { CreateTransaccionDto } from './dto/create-transaccion.dto';
 import { UpdateTransaccionDto } from './dto/update-transaccion.dto';
 import { AddItemDto } from './dto/add-item.dto';
@@ -15,6 +15,7 @@ import { CreatePagoDto } from './dto/create-pago.dto';
 import type { InferSelectModel } from 'drizzle-orm';
 import { DRIZZLE_DB } from '../../drizzle/drizzle.module';
 import { CajaService } from '../caja/caja.service';
+import { CocinaGateway } from './cocina.gateway';
 
 type Transaccion = InferSelectModel<typeof schema.transacciones>;
 type DetalleItem = InferSelectModel<typeof schema.detalle_items>;
@@ -27,32 +28,36 @@ export class TransaccionesService {
     @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
     private readonly cajaService: CajaService,
+    private readonly cocinaGateway: CocinaGateway,
   ) {}
 
   async create(
     createTransaccionDto: CreateTransaccionDto,
     usuario_id: string,
   ): Promise<any> {
-    // Validar que haya una caja abierta
-    const cajaAbierta = await this.cajaService.obtenerCajaAbierta();
-    if (!cajaAbierta) {
-      throw new BadRequestException(
-        'No hay una caja abierta. Debe abrir la caja antes de crear transacciones.',
+    // Intentar obtener caja abierta (opcional)
+    let caja_id = createTransaccionDto.caja_id;
+
+    try {
+      const cajaAbierta = await this.cajaService.obtenerCajaAbierta();
+      if (cajaAbierta) {
+        // Si hay caja abierta y no se proporcionó caja_id, usar la caja abierta
+        if (!caja_id) {
+          caja_id = cajaAbierta.id;
+        }
+        // Validar que el caja_id coincida con la caja abierta
+        else if (caja_id !== cajaAbierta.id) {
+          throw new BadRequestException(
+            'El ID de caja no coincide con la caja actualmente abierta.',
+          );
+        }
+      }
+    } catch {
+      // Si no hay caja abierta, continuar sin caja_id (será null)
+      console.warn(
+        'No se pudo obtener caja abierta, creando transacción sin caja',
       );
     }
-
-    // Validar que el caja_id coincida con la caja abierta
-    if (
-      createTransaccionDto.caja_id &&
-      createTransaccionDto.caja_id !== cajaAbierta.id
-    ) {
-      throw new BadRequestException(
-        'El ID de caja no coincide con la caja actualmente abierta.',
-      );
-    }
-
-    // Auto-asignar caja_id si no se proporciona
-    const caja_id = createTransaccionDto.caja_id || cajaAbierta.id;
 
     const [transaccion] = await this.db
       .insert(schema.transacciones)
@@ -65,10 +70,23 @@ export class TransaccionesService {
       })
       .returning();
 
-    return {
+    const resultado = {
       ...transaccion,
       monto_pendiente: '0.00',
     };
+
+    // Emitir evento de nueva transacción (sin items aún)
+    // Solo si tiene mesa o cliente (es un pedido de cocina)
+    if (transaccion.mesa || transaccion.cliente) {
+      try {
+        const pedidosPendientes = await this.findPendientesCocina();
+        this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+      } catch (error) {
+        console.error('Error al emitir actualización de cocina:', error);
+      }
+    }
+
+    return resultado;
   }
 
   async findAll(): Promise<any[]> {
@@ -126,6 +144,14 @@ export class TransaccionesService {
       })
       .where(eq(schema.transacciones.id, id))
       .returning();
+
+    // Emitir evento de actualización a cocina
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error('Error al emitir actualización de cocina:', error);
+    }
 
     return transaccionActualizada;
   }
@@ -233,6 +259,28 @@ export class TransaccionesService {
     // Recalcular monto_total
     await this.recalcularMontoTotal(transaccionId);
 
+    // Si se agregó un plato, actualizar estado_cocina a pendiente
+    if (addItemDto.plato_id) {
+      await this.db
+        .update(schema.transacciones)
+        .set({
+          estado_cocina: 'pendiente',
+          actualizado_en: new Date(),
+        })
+        .where(eq(schema.transacciones.id, transaccionId));
+    }
+
+    // Recalcular estado (puede reabrir si estaba cerrado y ahora tiene items pendientes)
+    await this.recalcularEstado(transaccionId);
+
+    // Emitir evento de actualización a cocina
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error('Error al emitir actualización de cocina:', error);
+    }
+
     return item;
   }
 
@@ -306,6 +354,14 @@ export class TransaccionesService {
     // Recalcular monto_total
     await this.recalcularMontoTotal(transaccionId);
 
+    // Emitir evento de actualización a cocina
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error('Error al emitir actualización de cocina:', error);
+    }
+
     return { message: 'Item eliminado correctamente' };
   }
 
@@ -378,6 +434,14 @@ export class TransaccionesService {
     // Recalcular monto_total de la transacción
     await this.recalcularMontoTotal(transaccionId);
 
+    // Emitir evento de actualización a cocina
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error('Error al emitir actualización de cocina:', error);
+    }
+
     return extra;
   }
 
@@ -447,6 +511,14 @@ export class TransaccionesService {
 
     // Recalcular monto_total
     await this.recalcularMontoTotal(transaccionId);
+
+    // Emitir evento de actualización a cocina
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error('Error al emitir actualización de cocina:', error);
+    }
 
     return { message: 'Extra eliminado correctamente' };
   }
@@ -522,10 +594,8 @@ export class TransaccionesService {
       );
     }
 
-    // Si está completamente pagado, cerrar transacción y descontar stock
-    if (nuevo_monto_pagado >= monto_total) {
-      await this.cerrarTransaccion(transaccionId);
-    }
+    // Recalcular estado (puede cerrar si también la cocina está terminada)
+    await this.recalcularEstado(transaccionId);
 
     // Calcular cambio para efectivo
     const cambio =
@@ -622,18 +692,53 @@ export class TransaccionesService {
       .where(eq(schema.transacciones.id, transaccionId));
   }
 
-  private async cerrarTransaccion(transaccionId: number): Promise<void> {
-    // Cambiar estado a cerrado
-    await this.db
-      .update(schema.transacciones)
-      .set({
-        estado: 'cerrado',
-        actualizado_en: new Date(),
-      })
-      .where(eq(schema.transacciones.id, transaccionId));
+  /**
+   * Recalcula y actualiza el estado de una transacción basándose en:
+   * - estado_cocina: debe ser 'terminado'
+   * - monto_pendiente: debe ser 0
+   * Solo cierra si AMBAS condiciones se cumplen.
+   */
+  private async recalcularEstado(transaccionId: number): Promise<void> {
+    const transaccion = await this.findOne(transaccionId);
 
-    // Descontar stock de productos e ingredientes
-    await this.descontarStock(transaccionId);
+    const monto_total = parseFloat(transaccion.monto_total);
+    const monto_pagado = parseFloat(transaccion.monto_pagado);
+    const monto_pendiente = monto_total - monto_pagado;
+
+    const pagado_completo = monto_pendiente <= 0.01; // Tolerancia para decimales
+    const cocina_terminada =
+      transaccion.estado_cocina === 'terminado' ||
+      transaccion.estado_cocina === null; // null = sin items de cocina
+
+    let nuevoEstado: string;
+
+    if (pagado_completo && cocina_terminada) {
+      nuevoEstado = 'cerrado';
+      // Solo descontar stock cuando se cierra definitivamente
+      if (transaccion.estado !== 'cerrado') {
+        await this.descontarStock(transaccionId);
+      }
+    } else if (monto_total > 0 || transaccion.estado_cocina === 'pendiente') {
+      nuevoEstado = 'abierto';
+    } else {
+      nuevoEstado = 'pendiente';
+    }
+
+    // Solo actualizar si cambió el estado
+    if (transaccion.estado !== nuevoEstado) {
+      await this.db
+        .update(schema.transacciones)
+        .set({
+          estado: nuevoEstado,
+          actualizado_en: new Date(),
+        })
+        .where(eq(schema.transacciones.id, transaccionId));
+    }
+  }
+
+  private async cerrarTransaccion(transaccionId: number): Promise<void> {
+    // Ahora usa recalcularEstado que verifica ambas condiciones
+    await this.recalcularEstado(transaccionId);
   }
 
   /**
@@ -662,6 +767,82 @@ export class TransaccionesService {
 
     return transaccionReabierta;
   }
+
+  // ========== VISTA DE COCINA ==========
+
+  async findPendientesCocina() {
+    const transacciones = await this.db
+      .select()
+      .from(schema.transacciones)
+      .where(
+        and(
+          eq(schema.transacciones.estado_cocina, 'pendiente'),
+          isNull(schema.transacciones.borrado_en),
+        ),
+      )
+      .orderBy(asc(schema.transacciones.fecha), asc(schema.transacciones.hora));
+
+    // Enriquecer con items y extras
+    const resultados = await Promise.all(
+      transacciones.map(async (t) => {
+        const items = await this.getItems(t.id);
+
+        // Enriquecer items con extras
+        const itemsConExtras = await Promise.all(
+          items.map(async (item) => {
+            const extras = await this.getExtras(t.id, item.id);
+            return { ...item, extras };
+          }),
+        );
+
+        return {
+          ...t,
+          monto_pendiente: (
+            parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
+          ).toFixed(2),
+          items: itemsConExtras,
+        };
+      }),
+    );
+
+    return resultados;
+  }
+
+  async completarOrdenCocina(id: number) {
+    try {
+      await this.findOne(id); // Verificar existencia
+
+      const result = await this.db
+        .update(schema.transacciones)
+        .set({
+          estado_cocina: 'terminado',
+          actualizado_en: new Date(),
+        })
+        .where(eq(schema.transacciones.id, id))
+        .returning();
+
+      // Recalcular estado (puede cerrar si también está pagado)
+      await this.recalcularEstado(id);
+
+      // Emitir evento de pedido completado
+      try {
+        this.cocinaGateway.emitPedidoCompletado(id);
+        const pedidosPendientes = await this.findPendientesCocina();
+        this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+      } catch (error) {
+        console.error('Error al emitir actualización de cocina:', error);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error en completarOrdenCocina:', error);
+      throw new BadRequestException(
+        'No se pudo completar la orden de cocina. Verifique que la columna estado_cocina exista en la base de datos.',
+      );
+    }
+  }
+
+  // ========== STOCK ==========
 
   private async descontarStock(transaccionId: number): Promise<void> {
     try {

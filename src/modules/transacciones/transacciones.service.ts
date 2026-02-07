@@ -664,96 +664,181 @@ export class TransaccionesService {
   }
 
   private async descontarStock(transaccionId: number): Promise<void> {
-    // Obtener todos los items de la transacción
-    const items = await this.db
-      .select()
-      .from(schema.detalle_items)
-      .where(
-        and(
-          eq(schema.detalle_items.transaccion_id, transaccionId),
-          isNull(schema.detalle_items.borrado_en),
-        ),
+    try {
+      console.log(
+        `[STOCK] Iniciando descuento para transacción ${transaccionId}`,
       );
 
-    for (const item of items) {
-      const cantidad = parseFloat(item.cantidad);
-
-      // Si es producto, descontar stock
-      if (item.producto_id) {
-        const [producto] = await this.db
-          .select()
-          .from(schema.productos)
-          .where(eq(schema.productos.id, item.producto_id));
-
-        if (producto) {
-          const nuevo_stock = producto.stock - Math.floor(cantidad);
-          await this.db
-            .update(schema.productos)
-            .set({ stock: nuevo_stock })
-            .where(eq(schema.productos.id, item.producto_id));
-        }
-      }
-
-      // Si es plato, descontar ingredientes
-      if (item.plato_id) {
-        const ingredientes = await this.db
-          .select()
-          .from(schema.plato_ingredientes)
-          .where(
-            and(
-              eq(schema.plato_ingredientes.plato_id, item.plato_id),
-              isNull(schema.plato_ingredientes.borrado_en),
-            ),
-          );
-
-        for (const pi of ingredientes) {
-          const cantidadIngrediente = parseFloat(pi.cantidad.toString());
-          const cantidad_descontar = cantidad * cantidadIngrediente;
-
-          await this.db
-            .update(schema.ingredientes)
-            .set({
-              cantidad: sql`${schema.ingredientes.cantidad} - ${cantidad_descontar}`,
-            })
-            .where(eq(schema.ingredientes.id, pi.ingrediente_id));
-        }
-      }
-    }
-
-    // Descontar extras que tienen ingrediente_id
-    const todosLosItems = await this.db
-      .select()
-      .from(schema.detalle_items)
-      .where(
-        and(
-          eq(schema.detalle_items.transaccion_id, transaccionId),
-          isNull(schema.detalle_items.borrado_en),
-        ),
-      );
-
-    for (const item of todosLosItems) {
-      const extras = await this.db
+      // Obtener todos los items de la transacción
+      const items = await this.db
         .select()
-        .from(schema.detalle_item_extras)
+        .from(schema.detalle_items)
         .where(
           and(
-            eq(schema.detalle_item_extras.detalle_item_id, item.id),
-            isNull(schema.detalle_item_extras.borrado_en),
+            eq(schema.detalle_items.transaccion_id, transaccionId),
+            isNull(schema.detalle_items.borrado_en),
           ),
         );
 
-      for (const extra of extras) {
-        if (extra.ingrediente_id) {
-          const cantidad_extra = parseFloat(extra.cantidad ?? '1');
+      console.log(`[STOCK] Items encontrados: ${items.length}`);
 
-          await this.db
-            .update(schema.ingredientes)
-            .set({
-              cantidad: sql`${schema.ingredientes.cantidad} - ${cantidad_extra}`,
-            })
-            .where(eq(schema.ingredientes.id, extra.ingrediente_id));
+      for (const item of items) {
+        const cantidad = parseFloat(item.cantidad);
+        console.log(
+          `[STOCK] Procesando item ${item.id}: cantidad=${cantidad}, producto_id=${item.producto_id}, plato_id=${item.plato_id}`,
+        );
+
+        // Si es producto, descontar stock
+        if (item.producto_id) {
+          try {
+            const [producto] = await this.db
+              .select()
+              .from(schema.productos)
+              .where(eq(schema.productos.id, item.producto_id));
+
+            if (producto) {
+              const stock_anterior = producto.stock;
+              const nuevo_stock = stock_anterior - Math.floor(cantidad);
+
+              await this.db
+                .update(schema.productos)
+                .set({ stock: nuevo_stock })
+                .where(eq(schema.productos.id, item.producto_id));
+
+              console.log(
+                `[STOCK] Producto ${item.producto_id}: ${stock_anterior} → ${nuevo_stock}`,
+              );
+            } else {
+              console.warn(
+                `[STOCK] Producto ${item.producto_id} no encontrado`,
+              );
+            }
+          } catch (error) {
+            console.error(
+              `[STOCK] Error al descontar producto ${item.producto_id}:`,
+              error,
+            );
+          }
+        }
+
+        // Si es plato, descontar ingredientes
+        if (item.plato_id) {
+          try {
+            const ingredientes = await this.db
+              .select()
+              .from(schema.plato_ingredientes)
+              .where(
+                and(
+                  eq(schema.plato_ingredientes.plato_id, item.plato_id),
+                  isNull(schema.plato_ingredientes.borrado_en),
+                ),
+              );
+
+            console.log(
+              `[STOCK] Plato ${item.plato_id} tiene ${ingredientes.length} ingredientes`,
+            );
+
+            for (const pi of ingredientes) {
+              try {
+                const cantidadIngrediente = parseFloat(pi.cantidad.toString());
+                const cantidad_descontar = cantidad * cantidadIngrediente;
+
+                console.log(
+                  `[STOCK] Descontando ingrediente ${pi.ingrediente_id}: ${cantidad_descontar} unidades`,
+                );
+
+                await this.db
+                  .update(schema.ingredientes)
+                  .set({
+                    cantidad: sql`${schema.ingredientes.cantidad} - ${cantidad_descontar}`,
+                  })
+                  .where(eq(schema.ingredientes.id, pi.ingrediente_id));
+
+                console.log(
+                  `[STOCK] ✓ Ingrediente ${pi.ingrediente_id} descontado`,
+                );
+              } catch (error) {
+                console.error(
+                  `[STOCK] Error al descontar ingrediente ${pi.ingrediente_id}:`,
+                  error,
+                );
+              }
+            }
+          } catch (error) {
+            console.error(
+              `[STOCK] Error al obtener ingredientes del plato ${item.plato_id}:`,
+              error,
+            );
+          }
         }
       }
+
+      // Descontar extras que tienen ingrediente_id
+      console.log(`[STOCK] Procesando extras...`);
+
+      for (const item of items) {
+        try {
+          const extras = await this.db
+            .select()
+            .from(schema.detalle_item_extras)
+            .where(
+              and(
+                eq(schema.detalle_item_extras.detalle_item_id, item.id),
+                isNull(schema.detalle_item_extras.borrado_en),
+              ),
+            );
+
+          console.log(`[STOCK] Item ${item.id} tiene ${extras.length} extras`);
+
+          for (const extra of extras) {
+            if (extra.ingrediente_id) {
+              try {
+                const cantidad_extra = parseFloat(extra.cantidad ?? '1');
+
+                console.log(
+                  `[STOCK] Descontando extra ingrediente ${extra.ingrediente_id}: ${cantidad_extra} unidades`,
+                );
+
+                await this.db
+                  .update(schema.ingredientes)
+                  .set({
+                    cantidad: sql`${schema.ingredientes.cantidad} - ${cantidad_extra}`,
+                  })
+                  .where(eq(schema.ingredientes.id, extra.ingrediente_id));
+
+                console.log(
+                  `[STOCK] ✓ Extra ingrediente ${extra.ingrediente_id} descontado`,
+                );
+              } catch (error) {
+                console.error(
+                  `[STOCK] Error al descontar extra ingrediente ${extra.ingrediente_id}:`,
+                  error,
+                );
+              }
+            } else {
+              console.log(
+                `[STOCK] Extra ${extra.id} no tiene ingrediente_id (es descripción libre)`,
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[STOCK] Error al procesar extras del item ${item.id}:`,
+            error,
+          );
+        }
+      }
+
+      console.log(
+        `[STOCK] ✓ Descuento completado para transacción ${transaccionId}`,
+      );
+    } catch (error) {
+      console.error(
+        `[STOCK] ERROR CRÍTICO en descontarStock para transacción ${transaccionId}:`,
+        error,
+      );
+      // No lanzar error para no bloquear el cierre de la transacción
+      // pero loggear para debugging
     }
   }
 

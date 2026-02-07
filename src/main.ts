@@ -62,7 +62,7 @@ async function bootstrap() {
       persistAuthorization: true, // Mantiene el token en localStorage
     },
   });
-  const port = configService.get<number>('PORT') ?? 4000;
+  const port = process.env.PORT ?? 3000;
 
   await app.listen(port);
   console.log(`🚀 Servidor corriendo en http://localhost:${port}`);

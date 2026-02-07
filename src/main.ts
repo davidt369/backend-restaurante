@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
 import { DateFormatterInterceptor } from './common/interceptors/date-formatter.interceptor';
 
 // ⏰ Configurar zona horaria para todo el proyecto (Bolivia)
@@ -10,7 +9,6 @@ process.env.TZ = 'America/La_Paz';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const configService = app.get(ConfigService);
 
   // 📅 Interceptor global para formatear fechas
   app.useGlobalInterceptors(new DateFormatterInterceptor());
@@ -21,7 +19,7 @@ async function bootstrap() {
   // 🌐 CORS
   const allowedOrigins = [
     'http://localhost:5173',
-    'https://young-waterfall-2598.maroger369.workers.dev',
+    'https://charqueria-oruro.vercel.app/',
   ];
 
   app.enableCors({

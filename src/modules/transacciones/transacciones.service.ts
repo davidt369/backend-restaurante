@@ -14,6 +14,7 @@ import { AddExtraDto } from './dto/add-extra.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
 import type { InferSelectModel } from 'drizzle-orm';
 import { DRIZZLE_DB } from '../../drizzle/drizzle.module';
+import { CajaService } from '../caja/caja.service';
 
 type Transaccion = InferSelectModel<typeof schema.transacciones>;
 type DetalleItem = InferSelectModel<typeof schema.detalle_items>;
@@ -25,23 +26,49 @@ export class TransaccionesService {
   constructor(
     @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
+    private readonly cajaService: CajaService,
   ) {}
 
   async create(
     createTransaccionDto: CreateTransaccionDto,
     usuario_id: string,
-  ): Promise<Transaccion> {
+  ): Promise<any> {
+    // Validar que haya una caja abierta
+    const cajaAbierta = await this.cajaService.obtenerCajaAbierta();
+    if (!cajaAbierta) {
+      throw new BadRequestException(
+        'No hay una caja abierta. Debe abrir la caja antes de crear transacciones.',
+      );
+    }
+
+    // Validar que el caja_id coincida con la caja abierta
+    if (
+      createTransaccionDto.caja_id &&
+      createTransaccionDto.caja_id !== cajaAbierta.id
+    ) {
+      throw new BadRequestException(
+        'El ID de caja no coincide con la caja actualmente abierta.',
+      );
+    }
+
+    // Auto-asignar caja_id si no se proporciona
+    const caja_id = createTransaccionDto.caja_id || cajaAbierta.id;
+
     const [transaccion] = await this.db
       .insert(schema.transacciones)
       .values({
         ...createTransaccionDto,
+        caja_id,
         usuario_id,
         monto_total: '0',
         monto_pagado: '0',
       })
       .returning();
 
-    return transaccion;
+    return {
+      ...transaccion,
+      monto_pendiente: '0.00',
+    };
   }
 
   async findAll(): Promise<any[]> {
@@ -486,6 +513,15 @@ export class TransaccionesService {
       })
       .where(eq(schema.transacciones.id, transaccionId));
 
+    // Registrar pago en caja
+    if (transaccion.caja_id) {
+      await this.registrarPagoEnCaja(
+        transaccion.caja_id,
+        createPagoDto.metodo_pago,
+        createPagoDto.monto,
+      );
+    }
+
     // Si está completamente pagado, cerrar transacción y descontar stock
     if (nuevo_monto_pagado >= monto_total) {
       await this.cerrarTransaccion(transaccionId);
@@ -719,5 +755,65 @@ export class TransaccionesService {
         }
       }
     }
+  }
+
+  // ========== INTEGRACIÓN CON CAJA ==========
+
+  /**
+   * Registrar pago en la caja automáticamente
+   */
+  private async registrarPagoEnCaja(
+    cajaId: number,
+    metodoPago: 'efectivo' | 'qr',
+    monto: number,
+  ): Promise<void> {
+    const [caja] = await this.db
+      .select()
+      .from(schema.caja_turno)
+      .where(eq(schema.caja_turno.id, cajaId));
+
+    if (!caja) return;
+
+    const ventasEfectivo = parseFloat(caja.ventas_efectivo || '0');
+    const ventasQr = parseFloat(caja.ventas_qr || '0');
+
+    if (metodoPago === 'efectivo') {
+      await this.db
+        .update(schema.caja_turno)
+        .set({
+          ventas_efectivo: (ventasEfectivo + monto).toFixed(2),
+        })
+        .where(eq(schema.caja_turno.id, cajaId));
+    } else if (metodoPago === 'qr') {
+      await this.db
+        .update(schema.caja_turno)
+        .set({
+          ventas_qr: (ventasQr + monto).toFixed(2),
+        })
+        .where(eq(schema.caja_turno.id, cajaId));
+    }
+  }
+
+  /**
+   * Obtener transacciones de una caja específica
+   */
+  async findByCaja(cajaId: number): Promise<any[]> {
+    const transacciones = await this.db
+      .select()
+      .from(schema.transacciones)
+      .where(
+        and(
+          eq(schema.transacciones.caja_id, cajaId),
+          isNull(schema.transacciones.borrado_en),
+        ),
+      )
+      .orderBy(desc(schema.transacciones.hora));
+
+    return transacciones.map((t) => ({
+      ...t,
+      monto_pendiente: (
+        parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
+      ).toFixed(2),
+    }));
   }
 }

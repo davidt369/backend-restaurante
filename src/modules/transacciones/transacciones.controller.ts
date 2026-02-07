@@ -111,6 +111,17 @@ export class TransaccionesController {
     return this.transaccionesService.reabrirTransaccion(id);
   }
 
+  @Get('caja/:cajaId')
+  @ApiOperation({ summary: 'Obtener transacciones de una caja específica' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de transacciones de la caja',
+  })
+  @ApiParam({ name: 'cajaId', type: 'number' })
+  getTransaccionesPorCaja(@Param('cajaId', ParseIntPipe) cajaId: number) {
+    return this.transaccionesService.findByCaja(cajaId);
+  }
+
   // ========== GESTIÓN DE ITEMS ==========
 
   @Post(':id/items')

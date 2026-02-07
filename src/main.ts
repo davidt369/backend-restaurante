@@ -19,7 +19,7 @@ async function bootstrap() {
   // 🌐 CORS
   const allowedOrigins = [
     'http://localhost:5173',
-    'https://charqueria-oruro.vercel.app/',
+    'https://charqueria-oruro.vercel.app',
   ];
 
   app.enableCors({

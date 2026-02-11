@@ -11,7 +11,7 @@
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "removeComments": true,
-    "incremental": true,
+    "incremental": false,
     "skipLibCheck": true,
     "strict": false
   },

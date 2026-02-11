@@ -29,7 +29,7 @@ export const usuarios = pgTable('usuarios', {
 
 export const caja_turno = pgTable('caja_turno', {
   id: serial('id').primaryKey(),
-  fecha: date('fecha').notNull().unique(),
+  fecha: date('fecha').notNull(),
   hora_apertura: timestamp('hora_apertura', {
     withTimezone: true,
   }).defaultNow(),

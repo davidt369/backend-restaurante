@@ -223,7 +223,7 @@ export class TransaccionesService {
         .from(schema.platos)
         .where(
           and(
-            eq(schema.platos.id, addItemDto.plato_id!),
+            eq(schema.platos.id, addItemDto.plato_id),
             isNull(schema.platos.borrado_en),
           ),
         );
@@ -1081,5 +1081,81 @@ export class TransaccionesService {
         parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
       ).toFixed(2),
     }));
+  }
+
+  /**
+   * 📊 Obtener resumen de items vendidos por caja
+   * Agrupa por producto/plato y suma cantidades y subtotales
+   */
+  async getResumenItemsPorCaja(cajaId: number) {
+    // Obtener todos los items de transacciones de esta caja
+    const items = await this.db
+      .select({
+        producto_id: schema.detalle_items.producto_id,
+        plato_id: schema.detalle_items.plato_id,
+        producto_nombre: schema.productos.nombre,
+        plato_nombre: schema.platos.nombre,
+        cantidad: schema.detalle_items.cantidad,
+        subtotal: schema.detalle_items.subtotal,
+      })
+      .from(schema.detalle_items)
+      .innerJoin(
+        schema.transacciones,
+        eq(schema.detalle_items.transaccion_id, schema.transacciones.id),
+      )
+      .leftJoin(
+        schema.productos,
+        eq(schema.detalle_items.producto_id, schema.productos.id),
+      )
+      .leftJoin(
+        schema.platos,
+        eq(schema.detalle_items.plato_id, schema.platos.id),
+      )
+      .where(
+        and(
+          eq(schema.transacciones.caja_id, cajaId),
+          isNull(schema.transacciones.borrado_en),
+          isNull(schema.detalle_items.borrado_en),
+          // Opcional: solo transacciones pagadas/cerradas?
+          // Por ahora incluimos todas las registradas en la caja
+        ),
+      );
+
+    // Agrupar y sumar
+    const agrupado = new Map<
+      string,
+      {
+        nombre: string;
+        cantidad: number;
+        total: number;
+        tipo: 'producto' | 'plato';
+      }
+    >();
+
+    for (const item of items) {
+      const isProducto = !!item.producto_id;
+      const idStr = isProducto ? `p-${item.producto_id}` : `d-${item.plato_id}`;
+      const nombre = isProducto
+        ? item.producto_nombre || 'Producto desconocido'
+        : item.plato_nombre || 'Plato desconocido';
+
+      const cantidad = parseFloat(item.cantidad);
+      const subtotal = parseFloat(item.subtotal);
+
+      const actual = agrupado.get(idStr);
+      if (actual) {
+        actual.cantidad += cantidad;
+        actual.total += subtotal;
+      } else {
+        agrupado.set(idStr, {
+          nombre,
+          cantidad,
+          total: subtotal,
+          tipo: isProducto ? 'producto' : 'plato',
+        });
+      }
+    }
+
+    return Array.from(agrupado.values()).sort((a, b) => b.total - a.total);
   }
 }

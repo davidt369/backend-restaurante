@@ -147,6 +147,13 @@ export class TransaccionesController {
     return this.transaccionesService.findByCaja(cajaId);
   }
 
+  @Get('caja/:cajaId/resumen')
+  @ApiOperation({ summary: 'Obtener resumen de items vendidos por caja' })
+  @ApiParam({ name: 'cajaId', type: 'number' })
+  getResumenItemsPorCaja(@Param('cajaId', ParseIntPipe) cajaId: number) {
+    return this.transaccionesService.getResumenItemsPorCaja(cajaId);
+  }
+
   // ========== GESTIÓN DE ITEMS ==========
 
   @Post(':id/items')

@@ -7,6 +7,8 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Param,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -15,6 +17,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { AbrirCajaDto, RegistrarGastoDto, CerrarCajaDto } from './dto';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -64,6 +67,14 @@ export class CajaController {
     @CurrentUser() user: { id: string },
   ) {
     return this.cajaService.abrirCaja(dto, user.id);
+  }
+
+  @Get(':id/detalle')
+  @Roles('admin', 'cajero')
+  @ApiOperation({ summary: 'Obtener detalle completo de una caja por ID' })
+  @ApiParam({ name: 'id', type: 'number' })
+  obtenerDetalleCaja(@Param('id', ParseIntPipe) id: number) {
+    return this.cajaService.obtenerDetalleCaja(id);
   }
 
   @Get('actual')

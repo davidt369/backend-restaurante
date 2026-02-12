@@ -292,6 +292,66 @@ export class CajaService {
   }
 
   /**
+   * 📋 Obtener detalle completo de una caja específica (histórico)
+   */
+  async obtenerDetalleCaja(id: number): Promise<ResumenCierre> {
+    const [caja] = await this.db
+      .select()
+      .from(caja_turno)
+      .where(eq(caja_turno.id, id));
+
+    if (!caja) {
+      throw new BadRequestException('Caja no encontrada');
+    }
+
+    const cajaResponse = this.convertirCajaAResponse(caja);
+
+    // Obtener gastos de la caja
+    const gastosDb = await this.db
+      .select()
+      .from(gastos_caja)
+      .where(eq(gastos_caja.caja_id, id));
+
+    const gastos: GastoCajaResponse[] = gastosDb.map((g) =>
+      this.convertirGastoAResponse(g),
+    );
+
+    // Calcular gastos separados
+    const gastosEfectivo = gastos
+      .filter((g) => g.metodo_pago === 'efectivo')
+      .reduce((sum, g) => sum + g.monto, 0);
+
+    const gastosQr = gastos
+      .filter((g) => g.metodo_pago === 'qr')
+      .reduce((sum, g) => sum + g.monto, 0);
+
+    // Cálculos
+    const montoInicial = cajaResponse.monto_inicial;
+    const ventasEfectivo = cajaResponse.ventas_efectivo;
+    const ventasQr = cajaResponse.ventas_qr;
+
+    const efectivoEsperado = montoInicial + ventasEfectivo - gastosEfectivo;
+    const totalQr = ventasQr - gastosQr;
+    const totalDelDia = ventasEfectivo + ventasQr;
+
+    return {
+      caja: cajaResponse,
+      resumen: {
+        monto_inicial: montoInicial,
+        ventas_efectivo: ventasEfectivo,
+        ventas_qr: ventasQr,
+        gastos_efectivo: gastosEfectivo,
+        gastos_qr: gastosQr,
+        efectivo_esperado: efectivoEsperado,
+        total_qr: totalQr,
+        total_del_dia: totalDelDia,
+        total_gastos: gastosEfectivo + gastosQr,
+      },
+      gastos,
+    };
+  }
+
+  /**
    * 🔴 Cerrar caja
    * Compara el efectivo contado vs el esperado
    */
@@ -310,13 +370,26 @@ export class CajaService {
     // Calcular diferencia
     const diferencia = montoContado - resumen.resumen.efectivo_esperado;
 
-    // Cerrar la caja
+    // Cerrar la caja y guardar el arqueo
     await this.db
       .update(caja_turno)
       .set({
         cerrada: true,
         hora_cierre: new Date(),
         cierre_obs: dto.cierre_obs,
+        // Guardar arqueo de billetes
+        b200: dto.b200,
+        b100: dto.b100,
+        b50: dto.b50,
+        b20: dto.b20,
+        b10: dto.b10,
+        b5: dto.b5,
+        // Guardar arqueo de monedas
+        m2: dto.m2,
+        m1: dto.m1,
+        m050: dto.m050,
+        m020: dto.m020,
+        m010: dto.m010,
       })
       .where(eq(caja_turno.id, cajaAbierta.id));
 

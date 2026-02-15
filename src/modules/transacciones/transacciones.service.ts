@@ -256,6 +256,30 @@ export class TransaccionesService {
       })
       .returning();
 
+    // Agregar extras si existen
+    if (addItemDto.extras && addItemDto.extras.length > 0) {
+      for (const extraDto of addItemDto.extras) {
+        if (
+          !extraDto.ingrediente_id &&
+          !extraDto.descripcion &&
+          !extraDto.precio
+        ) {
+          continue;
+        }
+
+        await this.db.insert(schema.detalle_item_extras).values({
+          detalle_item_id: item.id,
+          ingrediente_id: extraDto.ingrediente_id || null,
+          descripcion: extraDto.descripcion || null,
+          precio: extraDto.precio.toString(),
+          cantidad: extraDto.cantidad?.toString() || '1',
+        });
+      }
+
+      // Recalcular subtotal del item
+      await this.recalcularSubtotalItem(item.id);
+    }
+
     // Recalcular monto_total
     await this.recalcularMontoTotal(transaccionId);
 

@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsString,
   IsNotEmpty,
@@ -6,7 +7,10 @@ import {
   IsNumber,
   Min,
   ValidateIf,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
+import { AddExtraDto } from './add-extra.dto';
 
 export class AddItemDto {
   @ApiPropertyOptional({
@@ -44,5 +48,16 @@ export class AddItemDto {
   })
   @IsString()
   @IsOptional()
+  @IsOptional()
   notas?: string;
+
+  @ApiPropertyOptional({
+    description: 'Extras del item',
+    type: [AddExtraDto],
+  })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => AddExtraDto)
+  extras?: AddExtraDto[];
 }

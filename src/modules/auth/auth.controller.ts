@@ -50,8 +50,8 @@ export class AuthController {
           type: 'object',
           properties: {
             id: { type: 'string', example: 'usr_1234567890' },
-            nombre: { type: 'string', example: 'David Tola' },
-            nombre_usuario: { type: 'string', example: 'davidtola' },
+            nombre: { type: 'string', example: 'Administrador' },
+            nombre_usuario: { type: 'string', example: 'admin' },
             rol: { type: 'string', example: 'admin' },
           },
         },
@@ -82,8 +82,8 @@ export class AuthController {
       type: 'object',
       properties: {
         id: { type: 'string', example: 'usr_1234567890' },
-        nombre: { type: 'string', example: 'David Tola' },
-        nombre_usuario: { type: 'string', example: 'davidtola' },
+        nombre: { type: 'string', example: 'Administrador' },
+        nombre_usuario: { type: 'string', example: 'admin' },
         rol: { type: 'string', example: 'admin' },
       },
     },
@@ -117,8 +117,8 @@ export class AuthController {
           type: 'object',
           properties: {
             id: { type: 'string' },
-            nombre_usuario: { type: 'string' },
-            rol: { type: 'string' },
+            nombre_usuario: { type: 'string', example: 'admin' },
+            rol: { type: 'string', example: 'admin' },
           },
         },
       },

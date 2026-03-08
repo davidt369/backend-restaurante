@@ -42,7 +42,7 @@ async function bootstrap() {
   // Configuración de Swagger
   const config = new DocumentBuilder()
     .setTitle('API Restaurante')
-    .setDescription('API REST para el sistema de gestión de restaurante')
+    .setDescription('API REST para el sistema de gestión de restaurante23')
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -66,7 +66,20 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
 
   await app.listen(port);
-  console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
-  console.log(`📚 Swagger en http://localhost:${port}/api`);
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  console.log('\n');
+  console.log('╔════════════════════════════════════════════════╗');
+  console.log('║                                                ║');
+  console.log('║  🚀 SERVER RUNNING SUCCESSFULLY               ║');
+  console.log('║                                                ║');
+  console.log(`║  📍 API: http://localhost:${port}            ║`);
+  console.log(`║  📚 Swagger: http://localhost:${port}/api    ║`);
+  console.log('║                                                ║');
+  console.log('║  🔌 Database: PostgreSQL 17                    ║');
+  console.log('║  🌍 Region: America/La_Paz                     ║');
+  console.log('║                                                ║');
+  console.log('╚════════════════════════════════════════════════╝');
+  console.log('\n');
 }
 void bootstrap();

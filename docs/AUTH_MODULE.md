@@ -51,18 +51,18 @@ pnpm install
 
 ```bash
 # Resetear y crear el esquema
-pnpm db:fresh
+npm db:fresh
 
 # O ejecutar por pasos:
-pnpm db:reset    # Elimina todo
-pnpm db:generate # Genera migraciones
-pnpm db:migrate  # Aplica migraciones
-pnpm db:seed     # Crea usuarios de prueba
+npm db:reset    # Elimina todo
+npm db:generate # Genera migraciones
+npm db:migrate  # Aplica migraciones
+npm db:seed     # Crea usuarios de prueba
 ```
 
 ## 👥 Usuarios de Prueba
 
-Después de ejecutar `pnpm db:seed`, tendrás estos usuarios:
+Después de ejecutar `npm db:seed`, tendrás estos usuarios:
 
 | Usuario | Contraseña | Rol |
 |---------|------------|-----|

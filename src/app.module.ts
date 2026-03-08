@@ -8,11 +8,12 @@ import { ProductosModule } from './modules/productos/productos.module';
 import { IngredientesModule } from './modules/ingredientes/ingredientes.module';
 import { PlatosModule } from './modules/platos/platos.module';
 import { TransaccionesModule } from './modules/transacciones/transacciones.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // 👈 importante
+      isGlobal: true,
     }),
     DrizzleModule,
     AuthModule,
@@ -22,8 +23,7 @@ import { TransaccionesModule } from './modules/transacciones/transacciones.modul
     IngredientesModule,
     PlatosModule,
     TransaccionesModule,
+    DashboardModule,
   ],
-  // providers: [drizzleProvider],
-  // exports: [drizzleProvider],
 })
-export class AppModule {}
+export class AppModule { }

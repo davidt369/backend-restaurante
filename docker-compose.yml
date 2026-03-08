@@ -1,0 +1,106 @@
+# ============================================================
+# docker-compose.yml — Stack Profesional de Desarrollo
+#
+# Levanta:
+#   1. PostgreSQL 17 (Base de datos)
+#   2. NestJS (API REST)
+#
+# Usa variables de .env para DATABASE_URL
+#
+# Comandos:
+#   npm run dev              → Levantar TODO (postgresql + api)
+#   npm run down             → Detener contenedores
+#   npm run docker:destroy   → Eliminar volumen de datos
+#   npm run docker:logs      → Ver logs en tiempo real
+# ============================================================
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL 17 ─────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: restaurante_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: restaurante_user
+      POSTGRES_PASSWORD: restaurante_pass
+      POSTGRES_DB: restaurante_db
+      TZ: America/La_Paz
+      PGTZ: America/La_Paz
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restaurante_user -d restaurante_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - restaurante_network
+
+  # ── NestJS API ─────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: restaurante_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Vars que siempre se aplican (sobrescriben .env)
+      NODE_ENV: development
+      DATABASE_URL: postgresql://restaurante_user:restaurante_pass@postgres:5432/restaurante_db
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: restaurante_user
+      DB_NAME: restaurante_db
+      TZ: America/La_Paz
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hot-reload: monta el código del host
+      - ./src:/usr/src/app/src
+      - ./drizzle:/usr/src/app/drizzle
+      # Preservar node_modules del contenedor
+      - /usr/src/app/node_modules
+    networks:
+      - restaurante_network
+
+  # ── Frontend (Vite) ───────────────────────────────────────
+  frontend:
+    image: node:22-alpine
+    container_name: restaurante_frontend
+    restart: unless-stopped
+    working_dir: /usr/src/app
+    env_file:
+      - ../restaurante-v2-frontend/.env
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - HOST=0.0.0.0
+      - PORT=5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../restaurante-v2-frontend:/usr/src/app:delegated
+      - /usr/src/app/node_modules
+    command: >
+      sh -c "if [ ! -f /usr/src/app/.deps_installed ]; then npm install -g pnpm && if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else npm ci || npm install; fi && touch /usr/src/app/.deps_installed && echo '' && echo '╔════════════════════════════════════════════════╗' && echo '║  🚀 FRONTEND DEV SERVER                         ║' && echo '╠════════════════════════════════════════════════╣' && echo '║  Local:   http://localhost:5173                ║' && echo \"║  Network: http://$(hostname -i 2>/dev/null || echo unknown):5173\" && echo '╚════════════════════════════════════════════════╝'; fi; exec pnpm exec vite --host 0.0.0.0 --port 5173"
+    networks:
+      - restaurante_network
+
+networks:
+  restaurante_network:
+    driver: bridge
+    name: restaurante_dev_network
+
+volumes:
+  postgres_data:
+    name: restaurante_postgres_data

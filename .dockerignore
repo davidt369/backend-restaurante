@@ -1,0 +1,42 @@
+# ── Node ──────────────────────────────────────────────────
+node_modules
+
+# ── Build outputs ──────────────────────────────────────────
+dist
+
+# ── Git ────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── Editor / OS ────────────────────────────────────────────
+.vscode
+.idea
+*.DS_Store
+Thumbs.db
+
+# ── Logs ───────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Tests / Cobertura ──────────────────────────────────────
+coverage/
+test/
+
+# ── Docker ─────────────────────────────────────────────────
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# ── Documentación ──────────────────────────────────────────
+docs/
+README.md
+
+# ── Variables de entorno (nunca copiar al contexto) ────────
+.env
+.env.local
+.env.*.local
+
+# ── Gestores de paquetes alternativos ──────────────────────
+# (el contenedor usa npm; excluir lockfiles de otros gestores)
+pnpm-lock.yaml
+yarn.lock

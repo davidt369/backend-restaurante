@@ -2,6 +2,98 @@
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
+<h1 align="center">🍽️ Restaurante API</h1>
+
+<p align="center">
+  <strong>NestJS + PostgreSQL 17 + Drizzle ORM</strong>
+</p>
+
+---
+
+## 🚀 Setup Rápido para Nuevos Desarrolladores
+
+> **¿Es tu primer día?** Ejecuta esto y el proyecto estará 100% listo en 5 minutos.
+
+### Windows:
+```powershell
+.\setup.ps1
+```
+
+### Linux/Mac:
+```bash
+bash setup.sh
+```
+
+### Cualquier Sistema (Recomendado):
+```bash
+npm run setup
+```
+
+**↳ Lee [TEAM_ONBOARDING.md](./TEAM_ONBOARDING.md) para instrucciones detalladas**
+
+---
+
+## ⚡ Inicios Posteriores
+
+```bash
+# Levanta TODO (PostgreSQL + NestJS) con un comando:
+npm run dev
+
+# Ver en terminal:
+# 🚀 SERVER RUNNING SUCCESSFULLY
+# 📍 API: http://localhost:3000
+# 📚 Swagger: http://localhost:3000/api
+```
+
+---
+
+## 📚 Guías Importantes
+
+| Documento | Para Quién | Contenido |
+|-----------|-----------|----------|
+| **[TEAM_ONBOARDING.md](./TEAM_ONBOARDING.md)** | 👤 Nuevos devs | Guía de 5 min para primer setup |
+| **[SETUP.md](./SETUP.md)** | 👥 Equipo completo | Setup completo + troubleshooting |
+| **[DEVELOPMENT.md](./DEVELOPMENT.md)** | 💻 Desarrolladores | Arquitectura y estructura del código |
+| **[SETUP_SUMMARY.md](./SETUP_SUMMARY.md)** | 📋 Referencia | Qué se automatizó y por qué |
+
+---
+
+## 🔥 Otros Comandos Útiles
+
+```bash
+# Base de Datos
+npm run db:migrate         # Ejecutar migraciones
+npm run db:seed            # Cargar datos iniciales
+npm run db:fresh           # Reset + Migrate + Seed
+npm run db:reset           # Limpiar toda la DB
+
+# Docker
+npm run dev                # Levantar TODO
+npm run down               # Detener contenedores
+npm run docker:destroy     # Eliminar volumen de datos
+npm run docker:logs        # Ver logs en tiempo real
+npm run docker:shell       # Acceder a bash del contenedor
+
+# Testing
+npm run test               # Ejecutar tests
+npm run test:e2e          # Ejecutar tests end-to-end
+```
+
+---
+
+## 📖 Stack Tecnológico
+
+- **Framework**: NestJS 11
+- **Base de Datos**: PostgreSQL 17
+- **ORM**: Drizzle ORM
+- **Auth**: JWT (Passport)
+- **Container**: Docker + Docker Compose
+- **Node.js**: 22 LTS
+
+---
+
+
+
 [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
 [circleci-url]: https://circleci.com/gh/nestjs/nest
 

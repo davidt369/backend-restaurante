@@ -25,7 +25,20 @@
     "db:studio": "drizzle-kit studio",
     "db:reset": "tsx src/db/scripts/reset.ts",
     "db:seed": "tsx src/db/scripts/seed.ts",
-    "db:fresh": "pnpm db:reset && pnpm db:generate && pnpm db:migrate && pnpm db:seed"
+    "db:fresh": "npm run db:reset && npm run db:generate && npm run db:migrate && npm run db:seed",
+    "dev": "docker compose up --build",
+    "down": "docker compose down",
+    "docker:up": "docker compose up --build",
+    "docker:up:d": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:destroy": "docker compose down -v",
+    "docker:logs": "docker compose logs -f api",
+    "docker:migrate": "docker compose exec api npm run db:migrate",
+    "docker:seed": "docker compose exec api npm run db:seed",
+    "docker:fresh": "docker compose exec api npm run db:fresh",
+    "docker:shell": "docker compose exec api bash",
+    "setup": "node scripts/setup.js",
+    "setup:docs": "cat SETUP.md"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

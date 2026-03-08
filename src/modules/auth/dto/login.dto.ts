@@ -4,7 +4,7 @@ import { IsString, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
 export class LoginDto {
   @ApiProperty({
     description: 'Nombre de usuario del empleado',
-    example: 'davidtola',
+    example: 'admin',
     minLength: 3,
     maxLength: 30,
   })
@@ -16,7 +16,7 @@ export class LoginDto {
 
   @ApiProperty({
     description: 'Contraseña del usuario',
-    example: 'MiContraseña123!',
+    example: 'Admin123!',
     minLength: 6,
   })
   @IsString()

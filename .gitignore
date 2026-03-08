@@ -5,6 +5,15 @@
 /drizzle
 # Logs
 logs
+docker-compose.yml
+docker-compose*.yml
+Dockerfile
+Dockerfile.*
+entrypoint.sh
+setup.sh
+*.sh
+nixpacks.toml
+
 *.log
 npm-debug.log*
 pnpm-debug.log*

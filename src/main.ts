@@ -23,6 +23,7 @@ async function bootstrap() {
     'http://localhost:9000',
   ];
 
+  //nueva rama para probar  desarrollo
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,

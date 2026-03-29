@@ -1,12 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsNumber,
-  Min,
-  IsEnum,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, IsEnum, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { AddItemDto } from './add-item.dto';
 
 export class CreateTransaccionDto {
   @ApiProperty({
@@ -67,4 +62,14 @@ export class CreateTransaccionDto {
   @IsNumber()
   @IsOptional()
   caja_id?: number;
+
+  @ApiPropertyOptional({
+    description: 'Items del pedido',
+    type: [AddItemDto],
+  })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => AddItemDto)
+  items?: AddItemDto[];
 }

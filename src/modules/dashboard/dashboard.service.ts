@@ -20,6 +20,7 @@ export interface DashboardStats {
     transaccionesHoy: number;
     ordenesAbiertas: number;
     ingresosHoy: string;
+    ventaTotalBrutaHoy: string;
     actividadReciente: ActividadItem[];
 }
 
@@ -118,6 +119,19 @@ export class DashboardService {
             hora: t.hora ? t.hora.toISOString() : new Date().toISOString(),
         }));
 
+        // Venta total bruta de hoy (todas las transacciones no borradas)
+        const [ventaTotalResult] = await this.db
+            .select({
+                total: sql<string>`COALESCE(SUM(${schema.transacciones.monto_total}), 0)::numeric(10,2)::text`,
+            })
+            .from(schema.transacciones)
+            .where(
+                and(
+                    isNull(schema.transacciones.borrado_en),
+                    eq(schema.transacciones.fecha, hoy),
+                ),
+            );
+
         return {
             totalUsuarios: usuariosResult.count,
             totalProductos: productosResult.count,
@@ -125,6 +139,7 @@ export class DashboardService {
             transaccionesHoy: transaccionesHoyResult.count,
             ordenesAbiertas: ordenesAbiertasResult.count,
             ingresosHoy: ingresosResult.total ?? '0.00',
+            ventaTotalBrutaHoy: ventaTotalResult.total ?? '0.00',
             actividadReciente,
         };
     }

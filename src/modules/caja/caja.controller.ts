@@ -9,6 +9,7 @@ import {
   Query,
   Param,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -258,6 +259,17 @@ export class CajaController {
   })
   async cerrarCaja(@Body() dto: CerrarCajaDto) {
     return this.cajaService.cerrarCaja(dto);
+  }
+
+  @Patch(':id/arqueo')
+  @Roles('admin', 'cajero')
+  @ApiOperation({ summary: '🖋️ Guardar arqueo sin cerrar caja' })
+  @ApiParam({ name: 'id', type: 'number' })
+  async guardarArqueo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: any
+  ) {
+    return this.cajaService.guardarArqueo(id, dto);
   }
 
   @Get('historial')

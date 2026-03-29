@@ -392,7 +392,6 @@ export class CajaService {
         m010: dto.m010,
       })
       .where(eq(caja_turno.id, cajaAbierta.id));
-
     return {
       caja_id: cajaAbierta.id,
       fecha: cajaAbierta.fecha,
@@ -403,6 +402,29 @@ export class CajaService {
         diferencia === 0 ? 'exacto' : diferencia > 0 ? 'sobrante' : 'faltante',
       resumen_completo: resumen,
     };
+  }
+
+  /**
+   * 🖋️ Guardar arqueo (conteo-cuadre) sin cerrar caja
+   * Solo persiste los valores de billetes y monedas actuales
+   */
+  async guardarArqueo(id: number, dto: any): Promise<void> {
+    await this.db
+      .update(caja_turno)
+      .set({
+        b200: dto.b200,
+        b100: dto.b100,
+        b50: dto.b50,
+        b20: dto.b20,
+        b10: dto.b10,
+        b5: dto.b5,
+        m2: dto.m2,
+        m1: dto.m1,
+        m050: dto.m050,
+        m020: dto.m020,
+        m010: dto.m010,
+      })
+      .where(eq(caja_turno.id, id));
   }
 
   /**

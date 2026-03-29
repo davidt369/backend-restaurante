@@ -62,7 +62,12 @@ export class TransaccionesService {
     const [transaccion] = await this.db
       .insert(schema.transacciones)
       .values({
-        ...createTransaccionDto,
+        nro_reg: createTransaccionDto.nro_reg,
+        tipo: createTransaccionDto.tipo,
+        concepto: createTransaccionDto.concepto,
+        mesa: createTransaccionDto.mesa,
+        cliente: createTransaccionDto.cliente,
+        estado: createTransaccionDto.estado,
         caja_id,
         usuario_id,
         monto_total: '0',
@@ -70,12 +75,17 @@ export class TransaccionesService {
       })
       .returning();
 
-    const resultado = {
-      ...transaccion,
-      monto_pendiente: '0.00',
-    };
+    // Si hay items, agregarlos
+    if (createTransaccionDto.items && createTransaccionDto.items.length > 0) {
+      for (const itemDto of createTransaccionDto.items) {
+        await this.addItem(transaccion.id, itemDto);
+      }
+    }
 
-    // Emitir evento de nueva transacción (sin items aún)
+    // Obtener la transacción actualizada con los montos recalculados por addItem
+    const transaccionActualizada = await this.findOne(transaccion.id);
+
+    // Emitir evento de nueva transacción
     // Solo si tiene mesa o cliente (es un pedido de cocina)
     if (transaccion.mesa || transaccion.cliente) {
       try {
@@ -86,7 +96,7 @@ export class TransaccionesService {
       }
     }
 
-    return resultado;
+    return transaccionActualizada;
   }
 
   async findAll(): Promise<any[]> {
@@ -676,9 +686,8 @@ export class TransaccionesService {
     }, 0);
 
     // Calcular nuevo subtotal
-    const subtotal_base =
-      parseFloat(item.precio_unitario) * parseFloat(item.cantidad);
-    const subtotal_total = subtotal_base + sumaExtras;
+    const subtotal_unitario = parseFloat(item.precio_unitario) + sumaExtras;
+    const subtotal_total = subtotal_unitario * parseFloat(item.cantidad);
 
     // Actualizar item
     await this.db

@@ -26,4 +26,4 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     DashboardModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

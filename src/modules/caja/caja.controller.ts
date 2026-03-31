@@ -265,10 +265,7 @@ export class CajaController {
   @Roles('admin', 'cajero')
   @ApiOperation({ summary: '🖋️ Guardar arqueo sin cerrar caja' })
   @ApiParam({ name: 'id', type: 'number' })
-  async guardarArqueo(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: any
-  ) {
+  async guardarArqueo(@Param('id', ParseIntPipe) id: number, @Body() dto: any) {
     return this.cajaService.guardarArqueo(id, dto);
   }
 

@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
 const TIMEZONE = 'America/La_Paz';
-const DATE_FORMAT = "HH:mm - dd/MM/yyyy";
+const DATE_FORMAT = 'HH:mm - dd/MM/yyyy';
 
 /**
  * Formatea una fecha al formato boliviano: HH:mm - dd/MM/yyyy
@@ -37,7 +37,9 @@ export function transformDates<T>(obj: T): T {
     const transformed: Record<string, unknown> = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        transformed[key] = transformDates((obj as Record<string, unknown>)[key]);
+        transformed[key] = transformDates(
+          (obj as Record<string, unknown>)[key],
+        );
       }
     }
     return transformed as T;

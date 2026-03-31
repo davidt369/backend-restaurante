@@ -23,7 +23,7 @@ export class PlatosService {
   constructor(
     @Inject(DRIZZLE_DB)
     private readonly db: NodePgDatabase<typeof schema>,
-  ) { }
+  ) {}
 
   async create(createPlatoDto: CreatePlatoDto): Promise<Plato> {
     const id = nanoid(10);

@@ -184,14 +184,16 @@ export class CajaService {
       return this.convertirCajaAResponse(nuevaCaja);
     } catch (error: any) {
       console.error('🔴 Error al abrir caja:', error);
-      
+
       // Drizzle puede envolver el error original en 'cause'
       const errorCode = error.code || error.cause?.code;
 
-      if (errorCode === '23505') { 
+      if (errorCode === '23505') {
         // Si sigue lanzando un error UNIQUE, significa que alguna restricción no mapeada de Postgres
         // aún existe en esa tabla de BD (e.g. un índice único manual sobre "fecha").
-        console.error('POSIBLE ERROR DE BASE DE DATOS REZAGADO: Existe una restricción única en "fecha".');
+        console.error(
+          'POSIBLE ERROR DE BASE DE DATOS REZAGADO: Existe una restricción única en "fecha".',
+        );
       }
       throw error;
     }

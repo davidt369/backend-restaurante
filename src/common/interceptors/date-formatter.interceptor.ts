@@ -18,8 +18,6 @@ export class DateFormatterInterceptor implements NestInterceptor {
     _context: ExecutionContext,
     next: CallHandler,
   ): Observable<unknown> {
-    return next
-      .handle()
-      .pipe(map((data: unknown) => transformDates(data) as unknown));
+    return next.handle().pipe(map((data: unknown) => transformDates(data)));
   }
 }

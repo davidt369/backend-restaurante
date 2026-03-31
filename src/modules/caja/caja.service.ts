@@ -5,12 +5,14 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, desc, InferSelectModel } from 'drizzle-orm';
+import { eq, desc, InferSelectModel, and } from 'drizzle-orm';
 
 import * as schema from '../../db/schema';
 import { caja_turno, gastos_caja } from '../../db/schema';
 import { DRIZZLE_DB } from '../../drizzle/drizzle.module';
 import { AbrirCajaDto, RegistrarGastoDto, CerrarCajaDto } from './dto';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 // Tipos inferidos de Drizzle
 type CajaTurno = InferSelectModel<typeof caja_turno>;
@@ -124,6 +126,27 @@ export class CajaService {
       );
     }
 
+    // Calcular fecha en la zona horaria de Bolivia
+    const nowPre = new Date();
+    const timeZonePre = 'America/La_Paz';
+    const zonedDatePre = toZonedTime(nowPre, timeZonePre);
+    const fechaValidacion = format(zonedDatePre, 'yyyy-MM-dd');
+
+    // Validar que no exista NINGÚN registro para hoy (ni abierto ni cerrado)
+    // Esto previene la violación de la restricción única en 'fecha' si la caja ya fue abierta y cerrada en el día
+    const [cajaHoy] = await this.db
+      .select({ id: caja_turno.id, cerrada: caja_turno.cerrada })
+      .from(caja_turno)
+      .where(eq(caja_turno.fecha, fechaValidacion))
+      .limit(1);
+
+    if (cajaHoy) {
+      throw new ConflictException(
+        `Ya existe un registro de caja para la fecha de hoy (${fechaValidacion}). ` +
+        'No se puede abrir una segunda caja el mismo día.',
+      );
+    }
+
     // Calcular el monto inicial basado en el conteo de billetes y monedas
     const montoInicial = this.calcularMonto({
       b200: dto.b200 ?? 0,
@@ -140,34 +163,51 @@ export class CajaService {
     });
 
     // Obtener fecha de hoy en formato YYYY-MM-DD (Bolivia)
-    const fechaHoy = new Date().toLocaleDateString('en-CA'); // formato ISO
+    const now = new Date();
+    const timeZone = 'America/La_Paz';
+    const zonedDate = toZonedTime(now, timeZone);
+    const fechaHoy = format(zonedDate, 'yyyy-MM-dd');
 
-    // Crear el registro de caja
-    const [nuevaCaja] = await this.db
-      .insert(caja_turno)
-      .values({
-        fecha: fechaHoy,
-        usuario_id: usuarioId,
-        monto_inicial: montoInicial.toString(),
-        b200: dto.b200 ?? 0,
-        b100: dto.b100 ?? 0,
-        b50: dto.b50 ?? 0,
-        b20: dto.b20 ?? 0,
-        b10: dto.b10 ?? 0,
-        b5: dto.b5 ?? 0,
-        m2: dto.m2 ?? 0,
-        m1: dto.m1 ?? 0,
-        m050: dto.m050 ?? 0,
-        m020: dto.m020 ?? 0,
-        m010: dto.m010 ?? 0,
-      })
-      .returning();
+    try {
+      // Crear el registro de caja
+      const [nuevaCaja] = await this.db
+        .insert(caja_turno)
+        .values({
+          fecha: fechaHoy,
+          usuario_id: usuarioId,
+          monto_inicial: montoInicial.toString(),
+          b200: dto.b200 ?? 0,
+          b100: dto.b100 ?? 0,
+          b50: dto.b50 ?? 0,
+          b20: dto.b20 ?? 0,
+          b10: dto.b10 ?? 0,
+          b5: dto.b5 ?? 0,
+          m2: dto.m2 ?? 0,
+          m1: dto.m1 ?? 0,
+          m050: dto.m050 ?? 0,
+          m020: dto.m020 ?? 0,
+          m010: dto.m010 ?? 0,
+        })
+        .returning();
 
-    if (!nuevaCaja) {
-      throw new BadRequestException('Error al crear la caja');
+      if (!nuevaCaja) {
+        throw new BadRequestException('Error al crear la caja');
+      }
+
+      return this.convertirCajaAResponse(nuevaCaja);
+    } catch (error: any) {
+      console.error('🔴 Error al abrir caja:', error);
+      
+      // Drizzle puede envolver el error original en 'cause'
+      const errorCode = error.code || error.cause?.code;
+
+      if (errorCode === '23505') { // UNIQUE violation en Postgres
+        throw new ConflictException(
+          'Ya existe un registro de caja para la fecha de hoy. Cierre la caja anterior o verifique los registros.',
+        );
+      }
+      throw error;
     }
-
-    return this.convertirCajaAResponse(nuevaCaja);
   }
 
   /**

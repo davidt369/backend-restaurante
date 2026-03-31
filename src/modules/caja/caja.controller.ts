@@ -273,7 +273,7 @@ export class CajaController {
   }
 
   @Get('historial')
-  @Roles('admin')
+  @Roles('admin', 'cajero')
   @ApiOperation({
     summary: '📜 Obtener historial de cajas',
     description: 'Devuelve las últimas cajas cerradas (historial).',

@@ -132,20 +132,7 @@ export class CajaService {
     const zonedDatePre = toZonedTime(nowPre, timeZonePre);
     const fechaValidacion = format(zonedDatePre, 'yyyy-MM-dd');
 
-    // Validar que no exista NINGÚN registro para hoy (ni abierto ni cerrado)
-    // Esto previene la violación de la restricción única en 'fecha' si la caja ya fue abierta y cerrada en el día
-    const [cajaHoy] = await this.db
-      .select({ id: caja_turno.id, cerrada: caja_turno.cerrada })
-      .from(caja_turno)
-      .where(eq(caja_turno.fecha, fechaValidacion))
-      .limit(1);
-
-    if (cajaHoy) {
-      throw new ConflictException(
-        `Ya existe un registro de caja para la fecha de hoy (${fechaValidacion}). ` +
-        'No se puede abrir una segunda caja el mismo día.',
-      );
-    }
+    // Se ha eliminado la validación que impedía abrir múltiples cajas el mismo día.
 
     // Calcular el monto inicial basado en el conteo de billetes y monedas
     const montoInicial = this.calcularMonto({
@@ -201,10 +188,10 @@ export class CajaService {
       // Drizzle puede envolver el error original en 'cause'
       const errorCode = error.code || error.cause?.code;
 
-      if (errorCode === '23505') { // UNIQUE violation en Postgres
-        throw new ConflictException(
-          'Ya existe un registro de caja para la fecha de hoy. Cierre la caja anterior o verifique los registros.',
-        );
+      if (errorCode === '23505') { 
+        // Si sigue lanzando un error UNIQUE, significa que alguna restricción no mapeada de Postgres
+        // aún existe en esa tabla de BD (e.g. un índice único manual sobre "fecha").
+        console.error('POSIBLE ERROR DE BASE DE DATOS REZAGADO: Existe una restricción única en "fecha".');
       }
       throw error;
     }

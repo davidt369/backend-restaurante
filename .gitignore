@@ -13,7 +13,7 @@ entrypoint.sh
 setup.sh
 *.sh
 nixpacks.toml
-
+testsprite_tests
 *.log
 npm-debug.log*
 pnpm-debug.log*

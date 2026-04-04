@@ -109,7 +109,7 @@ export class TransaccionesController {
   }
 
   @Delete(':id')
-  @Roles('admin')
+  @Roles('admin', 'cajero')
   @ApiOperation({ summary: 'Eliminar una transacción (soft delete)' })
   @ApiResponse({
     status: 200,

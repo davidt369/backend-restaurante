@@ -167,18 +167,105 @@ export class TransaccionesService {
   }
 
   async remove(id: number): Promise<{ message: string }> {
-    await this.findOne(id);
+    const transaccion = await this.findOne(id);
 
+    // 1. Revertir pagos de la caja si existen
+    const pagosTransaccion = await this.db
+      .select()
+      .from(schema.pagos)
+      .where(
+        and(
+          eq(schema.pagos.transaccion_id, id),
+          isNull(schema.pagos.borrado_en),
+        ),
+      );
+
+    if (pagosTransaccion.length > 0 && transaccion.caja_id) {
+      for (const pago of pagosTransaccion) {
+        const monto = parseFloat(pago.monto);
+        const metodo = pago.metodo_pago as 'efectivo' | 'qr';
+
+        const [caja] = await this.db
+          .select()
+          .from(schema.caja_turno)
+          .where(eq(schema.caja_turno.id, transaccion.caja_id));
+
+        if (caja) {
+          const actualEfectivo = parseFloat(caja.ventas_efectivo || '0');
+          const actualQr = parseFloat(caja.ventas_qr || '0');
+
+          if (metodo === 'efectivo') {
+            await this.db
+              .update(schema.caja_turno)
+              .set({
+                ventas_efectivo: Math.max(0, actualEfectivo - monto).toFixed(2),
+              })
+              .where(eq(schema.caja_turno.id, transaccion.caja_id));
+          } else if (metodo === 'qr') {
+            await this.db
+              .update(schema.caja_turno)
+              .set({
+                ventas_qr: Math.max(0, actualQr - monto).toFixed(2),
+              })
+              .where(eq(schema.caja_turno.id, transaccion.caja_id));
+          }
+        }
+
+        // Soft delete del pago
+        await this.db
+          .update(schema.pagos)
+          .set({ borrado_en: new Date() })
+          .where(eq(schema.pagos.id, pago.id));
+      }
+    }
+
+    // 2. Soft delete de items y extras
+    const items = await this.db
+      .select()
+      .from(schema.detalle_items)
+      .where(
+        and(
+          eq(schema.detalle_items.transaccion_id, id),
+          isNull(schema.detalle_items.borrado_en),
+        ),
+      );
+
+    for (const item of items) {
+      await this.db
+        .update(schema.detalle_item_extras)
+        .set({ borrado_en: new Date() })
+        .where(eq(schema.detalle_item_extras.detalle_item_id, item.id));
+    }
+
+    await this.db
+      .update(schema.detalle_items)
+      .set({ borrado_en: new Date() })
+      .where(eq(schema.detalle_items.transaccion_id, id));
+
+    // 3. Soft delete de la transacción
     await this.db
       .update(schema.transacciones)
       .set({
         borrado_en: new Date(),
         actualizado_en: new Date(),
+        estado: 'anulado',
+        estado_cocina: 'anulado',
       })
       .where(eq(schema.transacciones.id, id));
 
+    // 4. Emitir actualización a cocina (CRÍTICO para que desaparezca de la pantalla de cocina)
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error(
+        'Error al emitir actualización de cocina tras eliminar:',
+        error,
+      );
+    }
+
     return {
-      message: `Transacción con ID ${id} eliminada exitosamente (soft delete)`,
+      message: `Transacción #${transaccion.nro_reg} eliminada exitosamente`,
     };
   }
 

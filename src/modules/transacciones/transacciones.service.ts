@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../db/schema';
-import { eq, isNull, and, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, desc, asc, sql } from 'drizzle-orm';
 import { CreateTransaccionDto } from './dto/create-transaccion.dto';
 import { UpdateTransaccionDto } from './dto/update-transaccion.dto';
 import { AddItemDto } from './dto/add-item.dto';
@@ -103,12 +103,12 @@ export class TransaccionesService {
     const transacciones = await this.db
       .select()
       .from(schema.transacciones)
-      .where(isNull(schema.transacciones.borrado_en))
-      .orderBy(desc(schema.transacciones.hora));
+      .orderBy(desc(schema.transacciones.creado_en));
 
-    // Add calculated monto_pendiente field
     return transacciones.map((t) => ({
       ...t,
+      hora: t.hora ? t.hora.toISOString() : null,
+      creado_en: t.creado_en ? t.creado_en.toISOString() : null,
       monto_pendiente: (
         parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
       ).toFixed(2),
@@ -1187,16 +1187,13 @@ export class TransaccionesService {
     const transacciones = await this.db
       .select()
       .from(schema.transacciones)
-      .where(
-        and(
-          eq(schema.transacciones.caja_id, cajaId),
-          isNull(schema.transacciones.borrado_en),
-        ),
-      )
+      .where(eq(schema.transacciones.caja_id, cajaId))
       .orderBy(desc(schema.transacciones.hora));
 
-    return transacciones.map((t) => ({
+    return transacciones.map((t: any) => ({
       ...t,
+      hora: t.hora ? t.hora.toISOString() : null,
+      creado_en: t.creado_en ? t.creado_en.toISOString() : null,
       monto_pendiente: (
         parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
       ).toFixed(2),
@@ -1277,5 +1274,94 @@ export class TransaccionesService {
     }
 
     return Array.from(agrupado.values()).sort((a, b) => b.total - a.total);
+  }
+
+  /**
+   * 🗑️ Obtener items eliminados de transacciones asociadas a una caja
+   */
+  async findDeletedItemsByCaja(cajaId: number) {
+    const items = await this.db
+      .select({
+        id: schema.detalle_items.id,
+        transaccion_id: schema.detalle_items.transaccion_id,
+        transaccion_nro: schema.transacciones.nro_reg,
+        producto_nombre: schema.productos.nombre,
+        plato_nombre: schema.platos.nombre,
+        cantidad: schema.detalle_items.cantidad,
+        precio_unitario: schema.detalle_items.precio_unitario,
+        subtotal: schema.detalle_items.subtotal,
+        borrado_en: schema.detalle_items.borrado_en,
+      })
+      .from(schema.detalle_items)
+      .innerJoin(
+        schema.transacciones,
+        eq(schema.detalle_items.transaccion_id, schema.transacciones.id),
+      )
+      .leftJoin(
+        schema.productos,
+        eq(schema.detalle_items.producto_id, schema.productos.id),
+      )
+      .leftJoin(
+        schema.platos,
+        eq(schema.detalle_items.plato_id, schema.platos.id),
+      )
+      .where(
+        and(
+          eq(schema.transacciones.caja_id, cajaId),
+          isNotNull(schema.detalle_items.borrado_en),
+        ),
+      );
+
+    return items.map((item) => ({
+      ...item,
+      borrado_en: item.borrado_en ? item.borrado_en.toISOString() : null,
+    }));
+  }
+
+  /**
+   * 📋 Obtener ventas detalladas con información de usuario y pagos
+   */
+  async findDetailedVentasByCaja(cajaId: number) {
+    const ventas = await this.db
+      .select({
+        id: schema.transacciones.id,
+        nro_reg: schema.transacciones.nro_reg,
+        fecha: schema.transacciones.fecha,
+        hora: schema.transacciones.hora,
+        monto_total: schema.transacciones.monto_total,
+        monto_pagado: schema.transacciones.monto_pagado,
+        mesa: schema.transacciones.mesa,
+        cliente: schema.transacciones.cliente,
+        estado: schema.transacciones.estado,
+        borrado_en: schema.transacciones.borrado_en,
+        usuario_nombre: schema.usuarios.nombre,
+      })
+      .from(schema.transacciones)
+      .leftJoin(schema.usuarios, eq(schema.transacciones.usuario_id, schema.usuarios.id))
+      .where(
+        eq(schema.transacciones.caja_id, cajaId),
+      );
+
+    // Complementar con pagos para cada venta
+    const result = await Promise.all(
+      ventas.map(async (v: any) => {
+        const pagosVenta = await this.db
+          .select()
+          .from(schema.pagos)
+          .where(eq(schema.pagos.transaccion_id, v.id));
+        
+        return {
+          ...v,
+          hora: v.hora ? v.hora.toISOString() : null,
+          fecha: v.fecha ? v.fecha.toString() : null,
+          pagos: pagosVenta.map((p: any) => ({
+            ...p,
+            creado_en: p.creado_en ? p.creado_en.toISOString() : null
+          })),
+        };
+      })
+    );
+
+    return result;
   }
 }

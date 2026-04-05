@@ -22,8 +22,8 @@ type GastoCaja = InferSelectModel<typeof gastos_caja>;
 export interface CajaTurnoResponse {
   id: number;
   fecha: string;
-  hora_apertura: Date | null;
-  hora_cierre: Date | null;
+  hora_apertura: string | null;
+  hora_cierre: string | null;
   usuario_id: string | null;
   monto_inicial: number;
   b200: number | null;
@@ -169,6 +169,7 @@ export class CajaService {
           b20: dto.b20 ?? 0,
           b10: dto.b10 ?? 0,
           b5: dto.b5 ?? 0,
+          hora_apertura: new Date(),
           m2: dto.m2 ?? 0,
           m1: dto.m1 ?? 0,
           m050: dto.m050 ?? 0,
@@ -509,8 +510,12 @@ export class CajaService {
     return {
       id: caja.id,
       fecha: caja.fecha,
-      hora_apertura: caja.hora_apertura,
-      hora_cierre: caja.hora_cierre,
+      hora_apertura: caja.hora_apertura 
+        ? (typeof caja.hora_apertura === 'string' ? new Date(caja.hora_apertura).toISOString() : caja.hora_apertura.toISOString()) 
+        : null,
+      hora_cierre: caja.hora_cierre 
+        ? (typeof caja.hora_cierre === 'string' ? new Date(caja.hora_cierre).toISOString() : caja.hora_cierre.toISOString()) 
+        : null,
       usuario_id: caja.usuario_id,
       monto_inicial: parseFloat(caja.monto_inicial ?? '0'),
       b200: caja.b200,

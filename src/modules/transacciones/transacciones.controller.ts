@@ -275,4 +275,20 @@ export class TransaccionesController {
   getPagos(@Param('id', ParseIntPipe) id: number) {
     return this.transaccionesService.getPagos(id);
   }
+
+  // ========== REPORTES ==========
+
+  @Get('caja/:cajaId/items-eliminados')
+  @ApiOperation({ summary: 'Obtener items eliminados de una caja' })
+  @ApiParam({ name: 'cajaId', type: 'number' })
+  getItemsEliminados(@Param('cajaId', ParseIntPipe) cajaId: number) {
+    return this.transaccionesService.findDeletedItemsByCaja(cajaId);
+  }
+
+  @Get('caja/:cajaId/ventas-detalladas')
+  @ApiOperation({ summary: 'Obtener ventas detalladas de una caja' })
+  @ApiParam({ name: 'cajaId', type: 'number' })
+  getVentasDetalladas(@Param('cajaId', ParseIntPipe) cajaId: number) {
+    return this.transaccionesService.findDetailedVentasByCaja(cajaId);
+  }
 }

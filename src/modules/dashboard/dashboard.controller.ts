@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
@@ -17,42 +17,15 @@ export class DashboardController {
 
   @Get('stats')
   @ApiOperation({
-    summary: 'Obtener estadísticas del dashboard',
+    summary: 'Obtener estadísticas detalladas del dashboard',
     description:
-      'Retorna un resumen en tiempo real: conteo de usuarios, productos, platos, ' +
-      'transacciones del día, órdenes abiertas, ingresos del día y las últimas 5 actividades.',
+      'Retorna un resumen del periodo especificado (o hoy por defecto): ingresos, gastos, ganancia neta, ' +
+      'actividad reciente y datos para gráficos de rendimiento diario, métodos de pago e ítems top.',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Estadísticas del dashboard',
-    schema: {
-      type: 'object',
-      properties: {
-        totalUsuarios: { type: 'number', example: 4 },
-        totalProductos: { type: 'number', example: 12 },
-        totalPlatos: { type: 'number', example: 8 },
-        transaccionesHoy: { type: 'number', example: 15 },
-        ordenesAbiertas: { type: 'number', example: 3 },
-        ingresosHoy: { type: 'string', example: '850.00' },
-        actividadReciente: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number', example: 42 },
-              concepto: { type: 'string', example: 'Mesa 3 - Almuerzo' },
-              mesa: { type: 'string', example: 'Mesa 3', nullable: true },
-              estado: { type: 'string', example: 'abierto' },
-              monto_total: { type: 'string', example: '120.00' },
-              hora: { type: 'string', format: 'date-time' },
-            },
-          },
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'No autorizado' })
-  getStats() {
-    return this.dashboardService.getStats();
+  getStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.dashboardService.getStats(startDate, endDate);
   }
 }

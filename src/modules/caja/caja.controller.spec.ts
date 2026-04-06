@@ -14,7 +14,7 @@ describe('CajaController', () => {
   const mockCajaResponse: CajaTurnoResponse = {
     id: 1,
     fecha: '2026-03-30',
-    hora_apertura: new Date(),
+    hora_apertura: new Date().toISOString(),
     hora_cierre: null,
     usuario_id: 'usr_test',
     monto_inicial: 500,

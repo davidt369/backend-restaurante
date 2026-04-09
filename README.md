@@ -1,4 +1,277 @@
-<p align="center">
+# Restaurante API
+
+API principal del sistema Restaurante V2. Este backend concentra la logica de negocio, la autenticacion, el control de roles, la gestion de caja, las transacciones, el inventario y el panel de indicadores.
+
+## Que resuelve este backend
+
+El objetivo de esta API es ordenar la operacion diaria del restaurante en un solo punto central.
+
+- Controla el acceso de usuarios con JWT.
+- Registra apertura, cierre y resumen de caja.
+- Gestiona ventas, pagos, items y extras.
+- Mantiene catalogos de productos, ingredientes y platos.
+- Permite consultar indicadores del negocio desde el dashboard.
+- Guarda la informacion en PostgreSQL con trazabilidad por usuario y fecha.
+
+## Arquitectura general
+
+El backend esta construido con una arquitectura modular sobre NestJS.
+
+- `Auth`: inicio de sesion, perfil y control de acceso.
+- `Usuarios`: administracion de cuentas y roles.
+- `Caja`: apertura, gastos, resumen, cierre e historial.
+- `Productos`: catalogo de productos de venta.
+- `Ingredientes`: control de insumos y cantidades.
+- `Platos`: gestion del menu y recetas.
+- `Transacciones`: pedidos, detalle de items, extras y pagos.
+- `Dashboard`: metricas y resumen operativo.
+
+### Flujo general de funcionamiento
+
+1. El usuario inicia sesion con nombre de usuario y contrasena.
+2. La API valida las credenciales y devuelve un token JWT.
+3. El frontend envia ese token en cada solicitud protegida.
+4. La API verifica el token y el rol antes de ejecutar la accion.
+5. La informacion se guarda en PostgreSQL y queda disponible para consulta.
+
+## Stack tecnologico
+
+- NestJS 11
+- PostgreSQL 17
+- Drizzle ORM
+- JWT con Passport
+- Swagger para documentacion de la API
+- Docker y Docker Compose para ejecucion local reproducible
+
+## Requisitos previos
+
+Antes de ejecutar el proyecto necesitas:
+
+- Node.js 22 o superior.
+- Docker y Docker Compose instalados.
+- Acceso a un servidor PostgreSQL si no usas Docker.
+- Un archivo `.env` con las variables del backend.
+
+## Instalacion y arranque rapido
+
+### Opcion recomendada: Docker
+
+Desde la carpeta `api-backend`:
+
+```bash
+npm run dev
+```
+
+Este comando levanta el contenedor de base de datos y la API en un solo paso.
+
+### Opcion con setup guiado
+
+```bash
+npm run setup
+```
+
+### Inicio manual en desarrollo
+
+```bash
+npm install
+npm run start:dev
+```
+
+## Variables de entorno
+
+Revisa el archivo `.env` del proyecto. Las variables mas importantes suelen ser:
+
+- `DATABASE_URL`: conexion a PostgreSQL.
+- `JWT_SECRET`: clave para firmar tokens.
+- `PORT`: puerto de la API.
+- `NODE_ENV`: entorno de ejecucion.
+
+Si trabajas con Docker, la base de datos suele quedar disponible en `localhost:5435` y la API en `http://localhost:3000`.
+
+## Comandos utiles
+
+### Desarrollo y Docker
+
+```bash
+npm run dev
+npm run down
+npm run docker:logs
+npm run docker:destroy
+npm run docker:shell
+```
+
+### Base de datos
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run db:fresh
+npm run db:reset
+npm run db:studio
+```
+
+### Ejecucion local
+
+```bash
+npm run start
+npm run start:dev
+npm run start:prod
+```
+
+### Calidad y pruebas
+
+```bash
+npm run lint
+npm run test
+npm run test:watch
+npm run test:cov
+npm run test:e2e
+```
+
+## Endpoints principales
+
+La API usa el prefijo global `/api`.
+
+### Autenticacion
+
+- `POST /api/auth/login`: inicia sesion.
+- `GET /api/auth/profile`: devuelve el perfil autenticado.
+- `GET /api/auth/test-admin`: endpoint de prueba para validar roles.
+
+### Caja
+
+- `POST /api/caja/abrir`: abre caja.
+- `GET /api/caja/actual`: consulta la caja activa.
+- `POST /api/caja/gastos`: registra un gasto.
+- `GET /api/caja/resumen`: calcula el resumen previo al cierre.
+- `POST /api/caja/cerrar`: cierra la caja.
+- `GET /api/caja/historial`: lista las cajas cerradas.
+
+### Dashboard
+
+- `GET /api/dashboard/stats`: devuelve indicadores operativos y graficos.
+
+## Funcionamiento por modulo
+
+### Auth
+
+El modulo de autenticacion valida el nombre de usuario y la contrasena, genera un token JWT y entrega los datos basicos del usuario para que el frontend sepa que permisos aplicar.
+
+### Usuarios
+
+Permite administrar cuentas del sistema y separar responsabilidades entre administradores y cajeros.
+
+### Caja
+
+Este modulo cubre el flujo mas sensible del negocio:
+
+- apertura de turno,
+- registro de gastos,
+- consulta de caja activa,
+- calculo de resumen,
+- cierre con diferencia,
+- historial de turnos.
+
+### Inventario y catalogos
+
+Productos, ingredientes y platos funcionan como la base del menu y del control operativo. Esto permite que la venta no sea solo un registro de dinero, sino tambien una actualizacion del estado real del negocio.
+
+### Transacciones
+
+Registra lo que el cliente consumio, los extras solicitados y la forma de pago utilizada. Esto ayuda a evitar ventas incompletas y facilita la conciliacion al cierre.
+
+### Dashboard
+
+Presenta una lectura rapida del periodo seleccionado: ventas, gastos, ganancia neta, actividad reciente y graficos de comportamiento diario.
+
+## Seguridad y acceso
+
+La API protege los endpoints con:
+
+- JWT para autenticar peticiones.
+- Roles para limitar acceso a funciones sensibles.
+- Validacion global de datos para rechazar entradas invalidas.
+- CORS configurado para los orígenes permitidos.
+
+## Documentacion de la API
+
+Swagger esta disponible en:
+
+```bash
+http://localhost:3000/api
+```
+
+Desde alli puedes revisar rutas, parametros, ejemplos y autorizarte con el token JWT.
+
+## Pruebas
+
+El backend cuenta con pruebas de:
+
+- servicios,
+- controladores,
+- integracion,
+- pruebas end-to-end.
+
+Comandos recomendados:
+
+```bash
+npm run test
+npm run test:e2e
+npm run test:cov
+```
+
+## Despliegue y ejecucion estable
+
+Para desarrollo local y pruebas de equipo, la forma mas confiable de arrancar el sistema es Docker Compose. Esto evita diferencias entre estaciones de trabajo y asegura que la base de datos y la API levanten con la misma configuracion.
+
+## Estructura general del proyecto
+
+- `src/main.ts`: arranque de la aplicacion y configuracion global.
+- `src/app.module.ts`: composicion de modulos.
+- `src/db/schema.ts`: modelo de datos.
+- `src/modules/*`: modulos de negocio.
+- `test/*`: pruebas end-to-end.
+
+## Flujo operativo recomendado
+
+1. Ejecutar migraciones y seed.
+2. Levantar la API.
+3. Iniciar el frontend.
+4. Iniciar sesion con un usuario de prueba.
+5. Abrir caja y registrar una venta.
+6. Revisar resumen y cerrar turno.
+
+## Usuarios de prueba
+
+Si el seed ya fue cargado, normalmente existen usuarios de ejemplo para validar el sistema desde el frontend. Consulta el seed o la documentacion interna del proyecto para confirmar credenciales activas.
+
+## Problemas frecuentes
+
+### La API no conecta con la base de datos
+
+- Verifica `DATABASE_URL`.
+- Confirma que PostgreSQL este corriendo.
+- Revisa logs con `npm run docker:logs`.
+
+### Swagger no carga
+
+- Confirma que la API este ejecutandose.
+- Revisa que el puerto configurado sea el correcto.
+- Verifica que el prefijo `/api` no este duplicado en la URL.
+
+### El login falla aunque las credenciales sean correctas
+
+- Revisa que el seed de usuarios se haya ejecutado.
+- Verifica que la contrasena corresponda al ambiente actual.
+- Confirma que el usuario no este marcado como borrado.
+
+## Recursos relacionados
+
+- Documentacion tecnica del proyecto.
+- Manual del frontend.
+- Resultados de pruebas.
+- Guia de despliegue con Docker.<p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 

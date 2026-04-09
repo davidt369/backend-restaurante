@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../../db/schema';
-import { eq, and, isNull, isNotNull, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, desc, asc, sql, inArray } from 'drizzle-orm';
 import { CreateTransaccionDto } from './dto/create-transaccion.dto';
 import { UpdateTransaccionDto } from './dto/update-transaccion.dto';
 import { AddItemDto } from './dto/add-item.dto';
@@ -77,17 +77,22 @@ export class TransaccionesService {
 
     // Si hay items, agregarlos
     if (createTransaccionDto.items && createTransaccionDto.items.length > 0) {
+      // Usamos un bucle para addItem pero con una versión que NO emita a cocina cada vez
+      // para evitar el problema de N+1 consultas y emisiones repetitivas
       for (const itemDto of createTransaccionDto.items) {
-        await this.addItem(transaccion.id, itemDto);
+        await this.addItemLogic(transaccion.id, itemDto);
       }
     }
 
-    // Obtener la transacción actualizada con los montos recalculados por addItem
+    // Recalcular montos y estado final una sola vez
+    await this.recalcularMontoTotal(transaccion.id);
+    await this.recalcularEstado(transaccion.id);
+
+    // Obtener la transacción actualizada corregida
     const transaccionActualizada = await this.findOne(transaccion.id);
 
-    // Emitir evento de nueva transacción
-    // Solo si tiene mesa o cliente (es un pedido de cocina)
-    if (transaccion.mesa || transaccion.cliente) {
+    // Emitir evento de nueva transacción UNA SOLA VEZ al final
+    if (transaccionActualizada.mesa || transaccionActualizada.cliente) {
       try {
         const pedidosPendientes = await this.findPendientesCocina();
         this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
@@ -275,6 +280,31 @@ export class TransaccionesService {
     transaccionId: number,
     addItemDto: AddItemDto,
   ): Promise<DetalleItem> {
+    const item = await this.addItemLogic(transaccionId, addItemDto);
+
+    // Recalcular monto_total y estado para reflejar el cambio individual
+    await this.recalcularMontoTotal(transaccionId);
+    await this.recalcularEstado(transaccionId);
+
+    // Emitir evento de actualización a cocina
+    try {
+      const pedidosPendientes = await this.findPendientesCocina();
+      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
+    } catch (error) {
+      console.error('Error al emitir actualización de cocina:', error);
+    }
+
+    return item;
+  }
+
+  /**
+   * Lógica interna para añadir un item sin realizar recalculos globales ni emisiones.
+   * Útil para procesamiento por lotes (seeds, creación masiva).
+   */
+  private async addItemLogic(
+    transaccionId: number,
+    addItemDto: AddItemDto,
+  ): Promise<DetalleItem> {
     const transaccion = await this.findOne(transaccionId);
 
     // Si está cerrada, reabrirla automáticamente
@@ -377,9 +407,6 @@ export class TransaccionesService {
       await this.recalcularSubtotalItem(item.id);
     }
 
-    // Recalcular monto_total
-    await this.recalcularMontoTotal(transaccionId);
-
     // Si se agregó un plato, actualizar estado_cocina a pendiente
     if (addItemDto.plato_id) {
       await this.db
@@ -389,17 +416,6 @@ export class TransaccionesService {
           actualizado_en: new Date(),
         })
         .where(eq(schema.transacciones.id, transaccionId));
-    }
-
-    // Recalcular estado (puede reabrir si estaba cerrado y ahora tiene items pendientes)
-    await this.recalcularEstado(transaccionId);
-
-    // Emitir evento de actualización a cocina
-    try {
-      const pedidosPendientes = await this.findPendientesCocina();
-      this.cocinaGateway.emitPedidosActualizados(pedidosPendientes);
-    } catch (error) {
-      console.error('Error al emitir actualización de cocina:', error);
     }
 
     return item;
@@ -474,6 +490,9 @@ export class TransaccionesService {
 
     // Recalcular monto_total
     await this.recalcularMontoTotal(transaccionId);
+
+    // Recalcular estado
+    await this.recalcularEstado(transaccionId);
 
     // Emitir evento de actualización a cocina
     try {
@@ -820,6 +839,27 @@ export class TransaccionesService {
    */
   private async recalcularEstado(transaccionId: number): Promise<void> {
     const transaccion = await this.findOne(transaccionId);
+    
+    // Verificar si hay items de plato activos
+    const items = await this.db
+      .select()
+      .from(schema.detalle_items)
+      .where(
+        and(
+          eq(schema.detalle_items.transaccion_id, transaccionId),
+          isNull(schema.detalle_items.borrado_en),
+          isNotNull(schema.detalle_items.plato_id),
+        ),
+      );
+
+    // Si no hay platos, el estado_cocina ya no debería ser 'pendiente' si lo era
+    if (items.length === 0 && transaccion.estado_cocina === 'pendiente') {
+      await this.db
+        .update(schema.transacciones)
+        .set({ estado_cocina: null }) // O 'terminado', pero null indica sin pedidos
+        .where(eq(schema.transacciones.id, transaccionId));
+      transaccion.estado_cocina = null;
+    }
 
     const monto_total = parseFloat(transaccion.monto_total);
     const monto_pagado = parseFloat(transaccion.monto_pagado);
@@ -828,15 +868,20 @@ export class TransaccionesService {
     const pagado_completo = monto_pendiente <= 0.01; // Tolerancia para decimales
     const cocina_terminada =
       transaccion.estado_cocina === 'terminado' ||
+      transaccion.estado_cocina === 'anulado' ||
       transaccion.estado_cocina === null; // null = sin items de cocina
 
     let nuevoEstado: string;
 
     if (pagado_completo && cocina_terminada) {
-      nuevoEstado = 'cerrado';
-      // Solo descontar stock cuando se cierra definitivamente
-      if (transaccion.estado !== 'cerrado') {
-        await this.descontarStock(transaccionId);
+      if (monto_total === 0) {
+        nuevoEstado = 'pendiente'; // Es una orden vacía
+      } else {
+        nuevoEstado = 'cerrado';
+        // Solo descontar stock cuando se cierra definitivamente
+        if (transaccion.estado !== 'cerrado') {
+          await this.descontarStock(transaccionId);
+        }
       }
     } else if (monto_total > 0 || transaccion.estado_cocina === 'pendiente') {
       nuevoEstado = 'abierto';
@@ -849,7 +894,7 @@ export class TransaccionesService {
       await this.db
         .update(schema.transacciones)
         .set({
-          estado: nuevoEstado,
+          estado: nuevoEstado as any,
           actualizado_en: new Date(),
         })
         .where(eq(schema.transacciones.id, transaccionId));
@@ -902,30 +947,102 @@ export class TransaccionesService {
       )
       .orderBy(asc(schema.transacciones.fecha), asc(schema.transacciones.hora));
 
-    // Enriquecer con items y extras
-    const resultados = await Promise.all(
-      transacciones.map(async (t) => {
-        const items = await this.getItems(t.id);
+    if (transacciones.length === 0) return [];
 
-        // Enriquecer items con extras
-        const itemsConExtras = await Promise.all(
-          items.map(async (item) => {
-            const extras = await this.getExtras(t.id, item.id);
-            return { ...item, extras };
-          }),
-        );
+    const transaccionIds = transacciones.map((t) => t.id);
 
-        return {
-          ...t,
-          monto_pendiente: (
-            parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
-          ).toFixed(2),
-          items: itemsConExtras,
-        };
-      }),
-    );
+    // Obtener todos los items para estas transacciones en una sola consulta
+    const allItems = await this.db
+      .select({
+        id: schema.detalle_items.id,
+        transaccion_id: schema.detalle_items.transaccion_id,
+        producto_id: schema.detalle_items.producto_id,
+        plato_id: schema.detalle_items.plato_id,
+        producto_nombre: schema.productos.nombre,
+        plato_nombre: schema.platos.nombre,
+        cantidad: schema.detalle_items.cantidad,
+        precio_unitario: schema.detalle_items.precio_unitario,
+        subtotal: schema.detalle_items.subtotal,
+        notas: schema.detalle_items.notas,
+      })
+      .from(schema.detalle_items)
+      .leftJoin(
+        schema.productos,
+        eq(schema.detalle_items.producto_id, schema.productos.id),
+      )
+      .leftJoin(
+        schema.platos,
+        eq(schema.detalle_items.plato_id, schema.platos.id),
+      )
+      .where(
+        and(
+          inArray(schema.detalle_items.transaccion_id, transaccionIds),
+          isNull(schema.detalle_items.borrado_en),
+        ),
+      );
 
-    return resultados;
+    if (allItems.length === 0) {
+      return transacciones.map((t) => ({
+        ...t,
+        monto_pendiente: (
+          parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
+        ).toFixed(2),
+        items: [],
+      }));
+    }
+
+    const itemIds = allItems.map((i) => i.id);
+
+    // Obtener todos los extras para estos items en una sola consulta
+    const allExtras = await this.db
+      .select({
+        id: schema.detalle_item_extras.id,
+        detalle_item_id: schema.detalle_item_extras.detalle_item_id,
+        ingrediente_id: schema.detalle_item_extras.ingrediente_id,
+        descripcion: schema.detalle_item_extras.descripcion,
+        ingrediente_nombre: schema.ingredientes.nombre,
+        precio: schema.detalle_item_extras.precio,
+        cantidad: schema.detalle_item_extras.cantidad,
+      })
+      .from(schema.detalle_item_extras)
+      .leftJoin(
+        schema.ingredientes,
+        eq(schema.detalle_item_extras.ingrediente_id, schema.ingredientes.id),
+      )
+      .where(
+        and(
+          inArray(schema.detalle_item_extras.detalle_item_id, itemIds),
+          isNull(schema.detalle_item_extras.borrado_en),
+        ),
+      );
+
+    // Agrupar en memoria para evitar el N+1
+    const extrasByItemId = allExtras.reduce((acc, extra) => {
+      if (!acc[extra.detalle_item_id]) acc[extra.detalle_item_id] = [];
+      acc[extra.detalle_item_id].push({
+        ...extra,
+        nombre: extra.ingrediente_nombre || extra.descripcion,
+      });
+      return acc;
+    }, {} as Record<number, any[]>);
+
+    const itemsByTransaccionId = allItems.reduce((acc, item) => {
+      if (!acc[item.transaccion_id]) acc[item.transaccion_id] = [];
+      acc[item.transaccion_id].push({
+        ...item,
+        nombre: item.producto_nombre || item.plato_nombre,
+        extras: extrasByItemId[item.id] || [],
+      });
+      return acc;
+    }, {} as Record<number, any[]>);
+
+    return transacciones.map((t) => ({
+      ...t,
+      monto_pendiente: (
+        parseFloat(t.monto_total) - parseFloat(t.monto_pagado)
+      ).toFixed(2),
+      items: itemsByTransaccionId[t.id] || [],
+    }));
   }
 
   async completarOrdenCocina(id: number) {
@@ -1187,7 +1304,12 @@ export class TransaccionesService {
     const transacciones = await this.db
       .select()
       .from(schema.transacciones)
-      .where(eq(schema.transacciones.caja_id, cajaId))
+      .where(
+        and(
+          eq(schema.transacciones.caja_id, cajaId),
+          isNull(schema.transacciones.borrado_en),
+        ),
+      )
       .orderBy(desc(schema.transacciones.hora));
 
     return transacciones.map((t: any) => ({
